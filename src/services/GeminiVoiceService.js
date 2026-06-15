@@ -52,7 +52,12 @@ class GeminiVoiceService {
       try {
         this.ws.send(JSON.stringify(this.buildSetupMessage(queueItem, systemInstructions)));
         await this.startRecording(customInputStream, isTwilioMode);
-        onCallStateChange('speaking');
+        // CRITICAL: Notify caller that the audio output stream is now ready.
+        // This must happen after startRecording so agentAudioDestination exists.
+        if (this.agentAudioDestination?.stream) {
+          callbacks.onAudioOutputReady?.(this.agentAudioDestination.stream);
+        }
+        onCallStateChange(isTwilioMode ? 'active' : 'speaking');
       } catch (err) {
         onError?.("Failed to start voice stream: " + err.message);
         this.ws.close();
@@ -228,6 +233,12 @@ class GeminiVoiceService {
   }
 
   sendInitialGreeting() {
+    // In Twilio mode, do NOT proactively greet.
+    // Gemini listens passively; it will respond when the patient speaks first.
+    if (this.isTwilioMode) {
+      console.log('[Gemini] Twilio mode: initial greeting suppressed. Listening for patient...');
+      return;
+    }
     this.ws?.readyState === 1 && this.ws.send(JSON.stringify({ clientContent: { turns: [{ role: "user", parts: [{ text: "Hello" }] }], turnComplete: true } }));
   }
 

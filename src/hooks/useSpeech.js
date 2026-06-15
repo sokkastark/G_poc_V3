@@ -163,6 +163,15 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
           onCallStateChange: (state) => setCallState(state),
           onTranscriptUpdate: (role, text) => addMessage(role, text),
           onFunctionCall: (name, args) => handleFunctionCall(name, args),
+          // CRITICAL: This fires AFTER startRecording() completes inside ws.onopen,
+          // so agentAudioDestination is guaranteed to exist at this point.
+          // This is the correct moment to route Gemini's audio output to Twilio.
+          onAudioOutputReady: (audioStream) => {
+            if (audioStream) {
+              console.log('[useSpeech] Gemini audio output stream ready → routing to Twilio.');
+              telephonyService.setAudioInputStream(audioStream);
+            }
+          },
           onRecordingComplete: (dataUrl) => {
             if (activeItemRef.current) db.addCallRecording(activeItemRef.current.id, dataUrl);
           },
@@ -175,9 +184,9 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
             setTimeout(() => { setCallState('idle'); setActiveItem(null); }, 2000);
           }
         }, session?.remoteStream, !isMock);
+        // NOTE: Do NOT call getAudioOutputStream() here — it returns null because
+        // the WebSocket hasn't opened yet. Use onAudioOutputReady callback instead.
 
-        const geminiStream = geminiVoiceService.getAudioOutputStream();
-        if (geminiStream) telephonyService.setAudioInputStream(geminiStream);
       },
       onDisconnect: () => { endCall(); }
     });

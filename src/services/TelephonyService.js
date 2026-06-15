@@ -74,33 +74,61 @@ class TwilioAdapter {
       this.activeCall = call;
       call.on('accept', () => {
         onStatusChange("in-progress");
-        // Twilio does not expose a simple 'audio' event. We attempt multiple strategies
-        // to obtain the remote MediaStream from this WebRTC call:
-        // 1) call.getRemoteStream() (Twilio SDK v2 internal helper)
-        // 2) Scan the DOM for Twilio's hidden <audio> element with srcObject set
-        // 3) Fall back to null — GeminiVoiceService will then use getUserMedia
+        const callId = call.parameters?.CallSid || `twilio-${Date.now()}`;
+        // Store call ref for stream detection
+        this._pendingCall = call;
+        
+        // Strategy: Get Twilio remote audio stream via 3 escalating approaches.
+        // We wait 1500ms so WebRTC has time to negotiate and attach remote tracks.
         const tryGetRemoteStream = () => {
-          // Strategy 1: SDK method (may exist on some versions)
-          if (typeof call.getRemoteStream === 'function') {
-            const s = call.getRemoteStream();
-            if (s && s.getAudioTracks().length > 0) return s;
-          }
-          // Strategy 2: DOM audio element captureStream
-          const audioEls = document.querySelectorAll('audio');
-          for (const el of audioEls) {
-            if (el.srcObject instanceof MediaStream && el.srcObject.getAudioTracks().length > 0) {
-              return typeof el.captureStream === 'function' ? el.captureStream() : el.srcObject;
+          // Strategy 1 (BEST): Access the RTCPeerConnection receivers directly from Twilio internals.
+          // This gives us the raw MediaStream from the remote phone leg.
+          try {
+            const pc = call._mediaHandler?.version?.pc
+                     || call._mediaHandler?._pc
+                     || call._peerConnection;
+            if (pc && typeof pc.getReceivers === 'function') {
+              const tracks = pc.getReceivers().map(r => r.track).filter(Boolean);
+              if (tracks.length > 0) {
+                console.log('[Twilio] Remote stream via RTCPeerConnection receivers ✓');
+                return new MediaStream(tracks);
+              }
             }
-          }
+          } catch (e) { console.warn('[Twilio] RTCPeerConnection strategy failed:', e.message); }
+
+          // Strategy 2: Scan DOM for Twilio's hidden <audio> element with srcObject set
+          try {
+            const audioEls = document.querySelectorAll('audio');
+            for (const el of audioEls) {
+              if (el.srcObject instanceof MediaStream) {
+                const tracks = el.srcObject.getTracks();
+                if (tracks.length > 0) {
+                  console.log('[Twilio] Remote stream via DOM audio element ✓');
+                  return typeof el.captureStream === 'function' ? el.captureStream() : el.srcObject;
+                }
+              }
+            }
+          } catch (e) {}
+
+          // Strategy 3: SDK method (may exist on some versions)
+          try {
+            if (typeof call.getRemoteStream === 'function') {
+              const s = call.getRemoteStream();
+              if (s && s.getTracks().length > 0) {
+                console.log('[Twilio] Remote stream via call.getRemoteStream() ✓');
+                return s;
+              }
+            }
+          } catch (e) {}
+
+          console.warn('[Twilio] No remote stream found. Gemini will use browser mic as fallback.');
           return null;
         };
-        // Defer slightly so WebRTC has time to attach remote tracks
-        const callId = call.parameters?.CallSid || `twilio-${Date.now()}`;
+
         setTimeout(() => {
           const remoteStream = tryGetRemoteStream();
-          console.log('[Twilio] Remote stream acquired:', remoteStream ? 'YES' : 'FALLBACK');
           onConnect?.({ id: callId, remoteStream });
-        }, 1200);
+        }, 1500);
       });
       call.on('disconnect', () => {
         onStatusChange("ended");
