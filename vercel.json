@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/api/telephony/status", "destination": "/api/status" },
+    { "source": "/api/telephony/token", "destination": "/api/token" },
+    { "source": "/voice", "destination": "/api/voice" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -137,39 +137,28 @@
   }
 }
 
-// Left Sidebar (Vertical Layout like Velzon - Deep Blue-Indigo Sidebar)
+// Left Sidebar (Vertical Layout hidden for horizontal layout)
 .velzon-sidebar {
-  width: 250px;
-  height: 100vh;
-  position: fixed;
-  top: 0;
-  left: 0;
-  background: #2b3658; // Deep slate navy-blue as seen in default Velzon light layouts
-  border-right: 1px solid #363e5b;
-  z-index: 1001;
-  display: flex;
-  flex-direction: column;
+  display: none !important;
 }
 
 .sidebar-logo-container {
-  height: 70px;
-  background: #2b3658; // Matches sidebar background exactly
-  border-bottom: 1px solid #363e5b;
+  display: none !important;
 }
 
 .velzon-main-content {
-  margin-left: 250px;
+  margin-left: 0 !important;
   min-height: 100vh;
-  background-color: #f3f3f9;
+  background-color: #f4f6fa;
   display: flex;
   flex-direction: column;
 }
 
 // White Top Navbar
 .velzon-navbar {
-  height: 70px;
+  height: 60px;
   background: #ffffff;
-  border-bottom: 1px solid #e9ebec;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   padding: 0 1.5rem;
@@ -177,13 +166,14 @@
 
 // Navbar Search box formatting (matches Velzon input container)
 .velzon-search-input {
-  background: #f3f3f9 !important;
-  border: 1px solid #e9ebec !important;
-  border-radius: 20px;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px;
   padding-left: 35px;
-  color: #495057 !important;
-  font-size: 0.825rem;
+  color: #475569 !important;
+  font-size: 0.85rem;
   transition: all 0.2s ease;
+  width: 280px;
   
   &:focus {
     background: #ffffff !important;
@@ -252,4 +242,36 @@
   z-index: 1040;
   background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(2px);
+}
+
+// Custom Table style matching screenshots
+.table {
+  thead {
+    tr {
+      background-color: #ffffff !important;
+      th {
+        background-color: #ffffff !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        color: #64748b !important;
+        font-weight: 600 !important;
+        text-transform: none !important;
+        font-family: inherit;
+        padding: 10px 12px !important;
+        font-size: 0.85rem;
+      }
+    }
+  }
+  tbody {
+    tr {
+      td {
+        border-bottom: 1px solid #f1f5f9 !important;
+        padding: 12px !important;
+        color: #334155 !important;
+        font-size: 0.85rem;
+      }
+      &:hover {
+        background-color: #f8fafc !important;
+      }
+    }
+  }
 }

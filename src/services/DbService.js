@@ -35,6 +35,12 @@ class MockDbService {
     return this._getRawData().appointments || [];
   }
 
+  setAppointments(appointments) {
+    const data = this._getRawData();
+    data.appointments = appointments;
+    this._saveRawData(data);
+  }
+
   getDoctors() {
     return this._getRawData().doctors || [];
   }
