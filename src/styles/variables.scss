@@ -1,0 +1,36 @@
+// Bootstrap Variables Override for Guardian Voice Agent POC
+// Styled to match Velzon Admin Dashboard - Light/White Theme Accent
+
+// 1. Core Velzon Palette (Light / White Accent)
+$primary: #405189;       // Deep Blue-Indigo Accent
+$success: #0ab39c;       // Mint/Teal Green
+$danger: #f06548;        // Coral Red
+$warning: #f7b84b;       // Amber Orange
+$info: #299cdb;          // Sky Cyan
+$secondary: #878a99;     // Slate Gray
+$dark: #212529;          // Charcoal Black
+$light: #f3f3f9;         // Light Gray theme backdrop
+$body-bg: #f3f3f9;       // Velzon Light Body Background
+$body-color: #495057;    // Velzon Default Slate-Gray text
+
+// 2. Custom theme palette mappings
+$theme-colors: (
+  "primary": $primary,
+  "success": $success,
+  "danger": $danger,
+  "warning": $warning,
+  "info": $info,
+  "secondary": $secondary,
+  "dark": $dark,
+  "light": $light
+);
+
+// 3. Spacing & Borders (Light Card Aesthetics)
+$border-radius: 0.25rem;     // Tight borders
+$border-radius-lg: 0.35rem;
+$border-radius-sm: 0.2rem;
+$card-border-color: #e9ebec; // Light gray border outlines
+$card-bg: #ffffff;           // Pure white card background
+
+// 4. Typography
+$font-family-sans-serif: 'Poppins', 'Inter', system-ui, sans-serif;

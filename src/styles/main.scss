@@ -1,0 +1,27 @@
+// Main SCSS file importing overrides, Bootstrap framework, icons and theme styles
+
+// 1. Import variables overrides (must be imported before Bootstrap)
+@import "./variables.scss";
+
+// 2. Import Bootstrap SCSS
+@import "bootstrap/scss/bootstrap.scss";
+
+// 3. Import Bootstrap Icons
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+// 4. Import custom theme layout and designs
+@import "./theme.scss";
+
+// 5. Global Styles
+body {
+  background-color: $body-bg;
+  color: $body-color;
+  font-family: $font-family-sans-serif;
+  min-height: 100vh;
+}
+
+header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+}

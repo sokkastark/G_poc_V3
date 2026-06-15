@@ -1,0 +1,255 @@
+// Velzon CSS Theme Rules and Layout Overrides - Light/White Theme
+
+// Redefining .glass-card class to render as a Velzon White Card
+.glass-card {
+  background: #ffffff;
+  border: 1px solid #e9ebec;
+  border-radius: 0.25rem;
+  box-shadow: 0 1px 2px rgba(56, 65, 74, 0.05);
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: rgba(64, 81, 137, 0.25);
+    box-shadow: 0 5px 15px rgba(56, 65, 74, 0.08);
+  }
+}
+
+.card-header-velzon {
+  border-bottom: 1px dashed #e9ebec;
+  background-color: #ffffff;
+  padding: 1rem;
+}
+
+// Custom Alert box
+.glass-alert {
+  background: rgba(247, 184, 75, 0.05);
+  border: 1px solid rgba(247, 184, 75, 0.2);
+  color: #d89614;
+  border-radius: 0.25rem;
+  padding: 1rem;
+}
+
+// Glowing Pulse Animation for Active Calls
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 0 rgba(64, 81, 137, 0.3);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(64, 81, 137, 0);
+  }
+  100% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 0 rgba(64, 81, 137, 0);
+  }
+}
+
+.pulse-active {
+  animation: pulse-ring 2s infinite;
+}
+
+// Simulated Microphone Waves (using Velzon primary indigo)
+.wave-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 40px;
+
+  .bar {
+    width: 4px;
+    height: 10px;
+    background-color: #405189;
+    border-radius: 2px;
+    animation: bounce 1s infinite alternate;
+
+    &:nth-child(2) { animation-delay: 0.15s; }
+    &:nth-child(3) { animation-delay: 0.3s; }
+    &:nth-child(4) { animation-delay: 0.45s; }
+    &:nth-child(5) { animation-delay: 0.6s; }
+  }
+}
+
+@keyframes bounce {
+  from { height: 6px; transform: scaleY(1); }
+  to { height: 32px; transform: scaleY(1.5); }
+}
+
+// Soft Badge Classes mimicking Velzon Badges
+.badge-pending {
+  background: #f3f3f9;
+  color: #878a99;
+  border: 1px solid #e9ebec;
+  padding: 0.25em 0.6em;
+  font-weight: 500;
+}
+
+.badge-confirmed {
+  background: rgba(10, 179, 156, 0.1);
+  color: #0ab39c;
+  border: 1px solid rgba(10, 179, 156, 0.15);
+  padding: 0.25em 0.6em;
+  font-weight: 500;
+}
+
+.badge-cancelled {
+  background: rgba(240, 101, 72, 0.1);
+  color: #f06548;
+  border: 1px solid rgba(240, 101, 72, 0.15);
+  padding: 0.25em 0.6em;
+  font-weight: 500;
+}
+
+.badge-rescheduled {
+  background: rgba(247, 184, 75, 0.1);
+  color: #f7b84b;
+  border: 1px solid rgba(247, 184, 75, 0.15);
+  padding: 0.25em 0.6em;
+  font-weight: 500;
+}
+
+.badge-wrong-number {
+  background: rgba(135, 138, 153, 0.1);
+  color: #878a99;
+  border: 1px solid rgba(135, 138, 153, 0.15);
+  padding: 0.25em 0.6em;
+  font-weight: 500;
+}
+
+.badge-message-left {
+  background: rgba(64, 81, 137, 0.1);
+  color: #405189;
+  border: 1px solid rgba(64, 81, 137, 0.15);
+  padding: 0.25em 0.6em;
+  font-weight: 500;
+}
+
+// Custom Scrollbar
+.custom-scroll {
+  overflow-y: auto;
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+    &:hover { background: rgba(0, 0, 0, 0.25); }
+  }
+}
+
+// Left Sidebar (Vertical Layout like Velzon - Deep Blue-Indigo Sidebar)
+.velzon-sidebar {
+  width: 250px;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: #2b3658; // Deep slate navy-blue as seen in default Velzon light layouts
+  border-right: 1px solid #363e5b;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-logo-container {
+  height: 70px;
+  background: #2b3658; // Matches sidebar background exactly
+  border-bottom: 1px solid #363e5b;
+}
+
+.velzon-main-content {
+  margin-left: 250px;
+  min-height: 100vh;
+  background-color: #f3f3f9;
+  display: flex;
+  flex-direction: column;
+}
+
+// White Top Navbar
+.velzon-navbar {
+  height: 70px;
+  background: #ffffff;
+  border-bottom: 1px solid #e9ebec;
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+}
+
+// Navbar Search box formatting (matches Velzon input container)
+.velzon-search-input {
+  background: #f3f3f9 !important;
+  border: 1px solid #e9ebec !important;
+  border-radius: 20px;
+  padding-left: 35px;
+  color: #495057 !important;
+  font-size: 0.825rem;
+  transition: all 0.2s ease;
+  
+  &:focus {
+    background: #ffffff !important;
+    border-color: rgba(64, 81, 137, 0.3) !important;
+    box-shadow: none !important;
+  }
+}
+
+// Sidebar Links
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  padding: 0.7rem 1.5rem;
+  color: #abb9e8; // Soft readable light gray-indigo text
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  i {
+    font-size: 1.1rem;
+    margin-right: 15px;
+    color: #8f9fcb; // Desaturated blue icons
+  }
+
+  &:hover, &.active {
+    color: #fff;
+    i {
+      color: #fff;
+    }
+  }
+
+  &.active {
+    background: rgba(255, 255, 255, 0.08);
+    border-left: 3px solid #0ea5e9; // Cyan active indicator
+    padding-left: calc(1.5rem - 3px);
+  }
+}
+
+// Call Console overlay wrapper (Clean White theme)
+.console-overlay-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  height: 100vh;
+  z-index: 1050;
+  background: #ffffff;
+  box-shadow: -5px 0 30px rgba(56, 65, 74, 0.15);
+  border-left: 1px solid #e9ebec;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &.active {
+    transform: translateX(0);
+  }
+}
+
+// Backdrop when Console opens
+.console-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1040;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+}

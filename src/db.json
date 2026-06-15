@@ -1,0 +1,64 @@
+{
+  "doctors": [
+    { "id": "doc-1", "name": "Dr. Sarah Smith", "specialty": "Cardiology" },
+    { "id": "doc-2", "name": "Dr. Marcus Brown", "specialty": "Pediatrics" },
+    { "id": "doc-3", "name": "Dr. Elena Rostova", "specialty": "Neurology" }
+  ],
+  "appointments": [
+    {
+      "id": "apt-1",
+      "patientName": "John Doe",
+      "doctorId": "doc-1",
+      "doctorName": "Dr. Sarah Smith",
+      "date": "Tomorrow",
+      "time": "10:00 AM",
+      "status": "Pending",
+      "phoneNumber": "+15550192"
+    },
+    {
+      "id": "apt-2",
+      "patientName": "Sarah Connor",
+      "doctorId": "doc-1",
+      "doctorName": "Dr. Sarah Smith",
+      "date": "Tomorrow",
+      "time": "11:30 AM",
+      "status": "Pending",
+      "phoneNumber": "+15550143"
+    },
+    {
+      "id": "apt-3",
+      "patientName": "Mark Watney",
+      "doctorId": "doc-2",
+      "doctorName": "Dr. Marcus Brown",
+      "date": "June 10",
+      "time": "02:00 PM",
+      "status": "Pending",
+      "phoneNumber": "+15550187"
+    },
+    {
+      "id": "apt-4",
+      "patientName": "Bruce Wayne",
+      "doctorId": "doc-3",
+      "doctorName": "Dr. Elena Rostova",
+      "date": "June 11",
+      "time": "09:00 AM",
+      "status": "Pending",
+      "phoneNumber": "+15550112"
+    }
+  ],
+  "availableSlots": [
+    { "id": "slot-1", "date": "June 11", "time": "10:00 AM" },
+    { "id": "slot-2", "date": "June 11", "time": "12:00 PM" },
+    { "id": "slot-3", "date": "June 12", "time": "09:00 AM" },
+    { "id": "slot-4", "date": "June 12", "time": "03:00 PM" }
+  ],
+  "notifications": [],
+  "activityLogs": [
+    {
+      "id": "log-0",
+      "timestamp": "09:00 AM",
+      "message": "Guardian Voice Agent system initialized."
+    }
+  ],
+  "transcripts": []
+}

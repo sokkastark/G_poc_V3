@@ -1,0 +1,542 @@
+This is for office guardian. Need to create a mvp or poc. Setting up a voice agent for hospitals. 
+Simple flow dashboard contains patient and doctor details. Patients booked schedule. Agent will call the patient check for appointment confirmation and creates log on dashboard that patent confirmed appointment or rejected or asked for rescheduling. Based on this it informs docter. Via call. If requested for rescheduling chech avilable slots and book and log and inform. If docter is not pickup the call send message. 
+
+This is actually a very good Guardian MVP because it demonstrates the core value proposition without building a full hospital management system.
+
+Guardian Voice Agent MVP
+Goal
+
+Reduce missed appointments and manual follow-up calls by automating patient-doctor communication.
+
+Actors
+Patient
+
+Receives appointment reminder call.
+
+Doctor
+
+Receives updates about patient responses.
+
+Guardian AI Agent
+
+Handles calling, conversation, logging, scheduling, and notifications.
+
+Admin Dashboard
+
+Shows appointment status and call logs.
+
+MVP Flow
+Step 1: Appointment Created
+
+Dashboard contains:
+
+Patient	Doctor	Date	Time	Status
+John	Dr. Smith	10 Jun	10:00 AM	Pending
+Step 2: AI Calls Patient
+
+Voice Agent:
+
+Hello John.
+
+This is Guardian calling on behalf of Dr. Smith.
+
+You have an appointment scheduled on June 10 at 10 AM.
+
+Will you be attending?
+
+Step 3: Patient Response
+Case A - Confirm
+
+Patient:
+
+Yes, I will attend.
+
+Dashboard updates:
+
+Status
+Confirmed ✅
+
+Log:
+
+Patient confirmed appointment.
+Timestamp: 09:32 AM
+Case B - Cancel
+
+Patient:
+
+No, I cannot come.
+
+Dashboard:
+
+Status
+Cancelled ❌
+
+Log:
+
+Patient cancelled appointment.
+Reason captured.
+Case C - Reschedule
+
+Patient:
+
+I need another time.
+
+Agent:
+
+Let me check available slots.
+
+Agent queries available slots.
+
+11 Jun 10:00 AM
+11 Jun 12:00 PM
+12 Jun 09:00 AM
+
+Patient selects.
+
+Appointment updated.
+
+Dashboard:
+
+Status
+Rescheduled 🔄
+Doctor Notification Flow
+
+After patient interaction:
+
+Agent calls doctor.
+
+Example:
+
+Hello Doctor.
+
+Patient John has confirmed tomorrow's appointment.
+
+OR
+
+Patient John requested rescheduling.
+
+New appointment booked for June 11 at 10 AM.
+
+If Doctor Doesn't Pick Up
+
+Wait 30 seconds.
+
+Send:
+
+SMS
+
+WhatsApp
+
+Email
+
+Example:
+
+Patient: John
+
+Status: Rescheduled
+
+New Slot:
+11 Jun 10:00 AM
+Dashboard MVP
+Page 1: Appointments
+Patient	Doctor	Time	Status
+John	Smith	10 AM	Confirmed
+Sarah	Smith	11 AM	Rescheduled
+Mark	Brown	12 PM	Cancelled
+Page 2: Call Logs
+Date	Person	Result
+Today	John	Confirmed
+Today	Sarah	Rescheduled
+Today	Dr Smith	Not Answered
+Page 3: Voice Transcript
+
+Patient conversation transcript.
+
+Doctor conversation transcript.
+
+AI summary.
+
+Tech Stack (Fastest POC)
+Frontend
+Next.js
+Tailwind
+Shadcn UI
+Backend
+Next.js API Routes
+PostgreSQL
+Voice Agent
+
+Options:
+
+Vapi AI (fastest)
+Retell AI
+Bland AI
+
+For MVP, Vapi is probably the quickest.
+
+Telephony
+Twilio
+AI
+OpenAI GPT
+Demo Scenario
+
+For a hospital demo, you only need:
+
+5 Screens
+Login
+Dashboard
+Patient List
+Appointment Queue
+Call Logs
+3 Voice Workflows
+Appointment Confirmation
+Appointment Cancellation
+Appointment Rescheduling
+
+This can be built as a working POC in roughly 1–2 weeks if you're using Vapi + Twilio rather than building voice infrastructure yourself.
+
+The interesting part is that this fits directly into Guardian's broader vision. Today it's appointment confirmation; tomorrow the same voice agent can handle:
+
+Patient follow-up calls
+Prescription reminders
+Lab result notifications
+Insurance verification
+Care coordination
+Transition-of-care outreach
+
+So the MVP is small, but the platform story becomes much larger when pitching it to hospitals.
+
+You do not necessarily need two devices. It depends on how you implement the demo.
+
+Option 1: Browser Call (Easiest)
+
+You can test on one mobile phone.
+
+Flow:
+
+Dashboard
+    ↓
+Click "Call Patient"
+    ↓
+Voice Agent Starts
+    ↓
+You Speak
+    ↓
+Agent Responds
+
+This is essentially a voice conversation inside the browser/app using the microphone and speaker.
+
+Devices needed: 1
+
+Option 2: Real Phone Call (Twilio)
+
+If the system actually dials a phone number:
+
+Laptop Dashboard
+      ↓
+Initiate Call
+      ↓
+Mobile Receives Call
+
+Then you'll typically need:
+
+Laptop (dashboard)
+Mobile phone (receiving call)
+
+Devices needed: 2
+
+However, you can still do it with one device if:
+
+Dashboard is on your laptop.
+The call comes to your mobile.
+Option 3: Two Browser Tabs
+
+For a pure demo:
+
+Patient Simulator
+      ↔
+Guardian Agent
+
+Open:
+
+Tab 1 = Dashboard/Admin
+Tab 2 = Patient Call Screen
+
+No phone network involved.
+
+Devices needed: 1
+
+For Your One-Day Guardian POC
+
+I'd recommend:
+
+Phase 1 (Today)
+
+Build:
+
+Dashboard
+      ↓
+Start Call
+      ↓
+Browser Voice Conversation
+      ↓
+Update Status
+
+Test entirely on your phone or laptop.
+
+Phase 2
+
+Replace browser voice with Twilio outbound calling.
+
+This way, you prove:
+
+Voice agent works
+Appointment flow works
+Dashboard updates work
+
+before spending time on telephony.
+
+For tomorrow's demo, a browser-based call running on a mobile device is completely feasible and only requires a single device for development and testing. The telephony integration can be swapped in later once the core conversation flow is validated.
+
+I agree with you will create brouser call setup. Test it then and create additional options for phone call. As the phone call is limited. Will show brouser call main. For demo will use one or two phone call.
+
+I think that's the right approach for a 1-day office POC.
+
+Phase 1: Browser Call (Primary Demo)
+
+This is what you should showcase during the presentation.
+
+Dashboard
+    ↓
+Start Voice Session
+    ↓
+Guardian Agent Speaks
+    ↓
+Patient Responds
+    ↓
+AI Understands Intent
+    ↓
+Dashboard Updates
+    ↓
+Doctor Notification Generated
+
+Benefits:
+
+Unlimited testing
+No telephony costs
+Faster development
+Easier debugging
+More reliable during demo
+Phase 2: Phone Call (Proof of Capability)
+
+Add a section:
+
+Communication Channels
+
+✓ Browser Call (Active)
+🚧 Phone Call (POC)
+🚧 WhatsApp Notification
+🚧 SMS Notification
+
+Or:
+
+[ Start Browser Call ]
+[ Call Patient ]
+
+The Browser Call becomes your primary demonstration.
+
+The Phone Call button is there to show:
+
+"The same Guardian agent can be connected to telephony providers such as Twilio for real outbound patient calls."
+
+MVP Screens
+Dashboard
+Guardian Voice Agent
+
+Appointments Today: 12
+
+Pending: 5
+Confirmed: 4
+Rescheduled: 2
+Cancelled: 1
+Appointment List
+John Doe
+
+Appointment:
+10:00 AM
+
+Status:
+Pending
+
+[ Start Browser Call ]
+[ Call Patient ]
+Voice Agent Console
+
+This is the impressive screen.
+
+Guardian Agent
+
+Listening...
+
+Transcript:
+
+Agent:
+Hello John. This is Guardian Hospital Assistant.
+
+Patient:
+Yes, I can attend tomorrow.
+
+Agent:
+Thank you. Your appointment has been confirmed.
+
+Intent:
+
+Detected Intent:
+CONFIRMED
+Activity Log
+09:12 AM
+Call Started
+
+09:13 AM
+Patient Confirmed
+
+09:13 AM
+Doctor Notification Generated
+What Management Will See
+
+They won't care whether the call is WebRTC, SIP, Twilio, or a browser microphone.
+
+They will care that:
+
+The AI talks naturally.
+The AI understands the patient.
+The AI takes action.
+The workflow updates automatically.
+
+If those four things work, the concept is validated.
+
+Build Order Tonight
+Hardcoded appointment data.
+Dashboard page.
+Browser voice conversation.
+Intent detection:
+Confirm
+Cancel
+Reschedule
+Status update.
+Activity log.
+Optional Twilio proof-of-concept button.
+
+That should give you a solid Guardian demo that looks like a real product rather than a telephony experiment. The browser experience becomes the hero demo, and the phone call becomes a secondary "deployment option" for later phases.
+
+How ever i am going to create this using anti-gravity. Tell to it about this
+
+Since you're using Anti-Gravity to generate the application, don't start with technical implementation details. Start with the business objective, workflow, screens, and constraints.
+
+You can give Anti-Gravity a prompt like this:
+
+Project Name: Guardian Voice Agent POC
+
+Objective:
+Build a working Proof of Concept (POC) for a hospital voice agent that can communicate with patients regarding appointments and update appointment status based on the conversation.
+
+Important Constraints:
+
+This is a 1-day POC.
+Focus on proving the voice agent workflow.
+Do not build enterprise features.
+Do not implement authentication.
+Do not implement a database.
+Use local mock data stored in TypeScript or JSON.
+The application should be easy to extend later.
+
+Core Workflow:
+
+Dashboard displays appointments.
+User selects an appointment.
+User clicks "Start Browser Call".
+Guardian Voice Agent starts a voice conversation.
+Agent asks:
+"Would you like to confirm, cancel, or reschedule your appointment?"
+Patient responds by voice.
+AI detects intent:
+Confirm
+Cancel
+Reschedule
+Dashboard updates appointment status.
+Activity log records the interaction.
+Doctor notification is generated and displayed.
+
+Voice Agent Requirements:
+
+Browser-based voice conversation.
+Use microphone input.
+Use speech-to-text.
+Use an LLM to classify intent.
+Use text-to-speech for responses.
+No telephony required for the main workflow.
+
+Future Support:
+
+Architecture should allow future integration with:
+Phone calls
+Twilio
+WhatsApp notifications
+SMS notifications
+Real scheduling systems
+Hospital databases
+
+Screens:
+
+Dashboard
+Total Appointments
+Pending
+Confirmed
+Cancelled
+Rescheduled
+Appointment List
+Columns:
+Patient Name
+Doctor Name
+Appointment Date
+Appointment Time
+Status
+Actions:
+Start Browser Call
+View Log
+Voice Agent Console
+Live transcript
+Agent messages
+Patient messages
+Detected intent
+Current status
+Activity Log
+Timestamp
+Event description
+
+Appointment Status Values:
+
+Pending
+Confirmed
+Cancelled
+Rescheduled
+
+Sample Appointment Data:
+Patient: John Doe
+Doctor: Dr. Smith
+Date: Tomorrow
+Time: 10:00 AM
+Status: Pending
+
+Expected Demo:
+User clicks "Start Browser Call".
+Agent speaks with patient.
+Patient confirms, cancels, or reschedules.
+Status updates immediately.
+Activity log is updated.
+Doctor notification is generated.
+
+Success Criteria:
+A complete end-to-end browser voice workflow demonstrating how Guardian can automate appointment confirmation and scheduling communication.
+
+One more thing: since this is for your office and you've mentioned Guardian has a healthcare focus, I'd ask Anti-Gravity to build the voice layer as a service abstraction (voiceService) rather than directly tying it to one provider. That way, later you can swap in Twilio, LiveKit, SIP, or another telephony solution without rewriting the application.
