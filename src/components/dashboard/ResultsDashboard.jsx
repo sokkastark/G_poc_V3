@@ -198,16 +198,16 @@ export function ResultsDashboard({ queue, rawCount, view = 'outcomes', onViewDet
                           </td>
                           <td>
                             {item.history && item.history.length > 0 ? (
-                              <div className="text-xs font-monospace text-secondary text-start">
-                                {item.history.map((h, i) => (
-                                  <div key={i}>
-                                    Attempt {h.attempt}: {h.outcome} at {h.timestamp}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted text-xs">No call attempts logged</span>
-                            )}
+                               <div className="text-xs font-monospace text-secondary text-start">
+                                 {item.history.map((h, i) => (
+                                   <div key={i}>
+                                     Attempt {h.attempt}: {h.outcome} at {h.timestamp} {h.duration !== undefined && h.duration !== null ? `(${h.duration}s)` : ''}
+                                   </div>
+                                 ))}
+                               </div>
+                             ) : (
+                               <span className="text-muted text-xs">No call attempts logged</span>
+                             )}
                           </td>
                           <td className="pe-3">
                             <button

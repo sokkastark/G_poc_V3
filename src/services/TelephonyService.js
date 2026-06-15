@@ -6,38 +6,28 @@ class MockTelephonyAdapter {
     this.name = "Mock Telephony Provider";
     this.activeCall = null;
   }
-
   dial(phoneNumber, callbacks) {
     const { onStatusChange, onConnect, onDisconnect } = callbacks;
     onStatusChange("dialing");
-    
-    // Simulate Ringing after 1s
     const ringTimeout = setTimeout(() => {
       onStatusChange("ringing");
-      
-      // Simulate Connection after another 1.5s
       const connectTimeout = setTimeout(() => {
         onStatusChange("in-progress");
         this.activeCall = { id: `call-${Math.random().toString(36).substr(2, 9)}`, phone: phoneNumber };
         onConnect?.(this.activeCall);
       }, 1500);
-
       this.activeCall = { ...this.activeCall, timeouts: [connectTimeout] };
     }, 1000);
-
     this.activeCall = { id: 'pending', phone: phoneNumber, timeouts: [ringTimeout], onDisconnect };
   }
-
   hangup() {
     if (this.activeCall) {
-      if (this.activeCall.timeouts) {
-        this.activeCall.timeouts.forEach(clearTimeout);
-      }
+      if (this.activeCall.timeouts) this.activeCall.timeouts.forEach(clearTimeout);
       this.activeCall.onDisconnect?.();
       this.activeCall = null;
     }
   }
-
+  setAudioInputStream(stream) {}
   getLogs(phoneNumber) {
     return [
       { timestamp: new Date().toLocaleTimeString(), message: `[Mock] Initializing SIP invite to ${phoneNumber}` },
@@ -54,103 +44,109 @@ class TwilioAdapter {
     this.activeCall = null;
     this.device = null;
     this.fallbackAdapter = null;
+    this.currentProcessor = null;
   }
-
   async dial(phoneNumber, callbacks) {
     const { onStatusChange, onConnect, onDisconnect } = callbacks;
     onStatusChange("dialing");
-
     try {
-      // 1. Fetch capability token from local node server or relative API path
       const apiBase = window.location.origin.includes('localhost') ? 'http://localhost:5000' : '';
       const res = await fetch(`${apiBase}/api/telephony/token`);
-      if (!res.ok) {
-        throw new Error("Local token server returned status error.");
-      }
+      if (!res.ok) throw new Error("Local token server returned status error.");
       const data = await res.json();
-      if (!data.token) {
-        throw new Error("No token returned from server.");
-      }
-
-      // 2. Initialize Twilio Client Device
-      this.device = new Device(data.token, {
-        logLevel: 'debug',
-        codecPreferences: ['pcmu', 'opus']
-      });
-
+      if (!data.token) throw new Error("No token returned from server.");
+      this.device = new Device(data.token, { logLevel: 'debug', codecPreferences: ['pcmu', 'opus'] });
       this.device.on('error', (err) => {
         console.error('[Twilio Device Error]', err);
         onStatusChange("ended");
         onDisconnect?.();
       });
-
       await this.device.register();
-
-      // 3. Connect outbound call (normalize to E.164 format with international prefix)
       let targetNumber = phoneNumber.trim();
       const digits = targetNumber.replace(/\D/g, '');
       if (!targetNumber.startsWith('+')) {
-        if (digits.length === 10) {
-          targetNumber = `+91${digits}`;
-        } else if (digits.length === 12 && digits.startsWith('91')) {
-          targetNumber = `+${digits}`;
-        } else if (digits.length === 11 && digits.startsWith('1')) {
-          targetNumber = `+${digits}`;
-        } else {
-          targetNumber = `+${digits}`;
-        }
+        if (digits.length === 10) targetNumber = `+91${digits}`;
+        else if (digits.length === 12 && digits.startsWith('91')) targetNumber = `+${digits}`;
+        else if (digits.length === 11 && digits.startsWith('1')) targetNumber = `+${digits}`;
+        else targetNumber = `+${digits}`;
       }
-
-      const call = await this.device.connect({
-        params: { To: targetNumber }
-      });
-
+      const call = await this.device.connect({ params: { To: targetNumber } });
       this.activeCall = call;
-
       call.on('accept', () => {
         onStatusChange("in-progress");
-        onConnect?.({ id: call.parameters.CallSid || `twilio-${Date.now()}` });
+        onConnect?.({ id: call.parameters.CallSid || `twilio-${Date.now()}`, remoteStream: call.getRemoteStream() });
       });
-
       call.on('disconnect', () => {
         onStatusChange("ended");
         onDisconnect?.();
         this.activeCall = null;
       });
-
       call.on('reject', () => {
         onStatusChange("ended");
         onDisconnect?.();
         this.activeCall = null;
       });
-
       onStatusChange("ringing");
     } catch (err) {
       console.warn("[Twilio] Real calling failed or not configured, falling back to Mock Telephony:", err.message);
-      
-      // Instantiate a mock fallback so campaign behaves identically
       this.fallbackAdapter = new MockTelephonyAdapter();
       this.fallbackAdapter.dial(phoneNumber, callbacks);
     }
   }
-
   hangup() {
     if (this.fallbackAdapter) {
       this.fallbackAdapter.hangup();
       this.fallbackAdapter = null;
       return;
     }
-
     if (this.activeCall) {
       this.activeCall.disconnect();
       this.activeCall = null;
     }
     if (this.device) {
+      if (this.currentProcessor) {
+        try { this.device.audio.removeProcessor(this.currentProcessor, false); } catch (e) {}
+        this.currentProcessor = null;
+      }
       this.device.destroy();
       this.device = null;
     }
   }
-
+  setAudioInputStream(stream) {
+    if (this.fallbackAdapter) {
+      this.fallbackAdapter.setAudioInputStream(stream);
+      return;
+    }
+    if (!this.device) return;
+    if (this.currentProcessor) {
+      try { this.device.audio.removeProcessor(this.currentProcessor, false); } catch (e) {}
+      this.currentProcessor = null;
+    }
+    if (stream) {
+      this.currentProcessor = {
+        async createProcessedStream(inputStream) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          const ctx = new AC();
+          const dest = ctx.createMediaStreamDestination();
+          const source1 = ctx.createMediaStreamSource(stream);
+          source1.connect(dest);
+          if (inputStream) {
+            const source2 = ctx.createMediaStreamSource(inputStream);
+            source2.connect(dest);
+          }
+          this.ctx = ctx;
+          return dest.stream;
+        },
+        async destroyProcessedStream() {
+          if (this.ctx) {
+            await this.ctx.close();
+            this.ctx = null;
+          }
+        }
+      };
+      this.device.audio.addProcessor(this.currentProcessor, false);
+    }
+  }
   getLogs(phoneNumber) {
     if (this.fallbackAdapter) {
       return [
@@ -158,7 +154,6 @@ class TwilioAdapter {
         ...this.fallbackAdapter.getLogs(phoneNumber)
       ];
     }
-
     return [
       { timestamp: new Date().toLocaleTimeString(), message: `[Twilio WebRTC] Querying capability token from helper server...` },
       { timestamp: new Date().toLocaleTimeString(), message: `[Twilio WebRTC] Device registered. WebRTC audio bridge ready.` },
@@ -169,34 +164,17 @@ class TwilioAdapter {
 
 export class TelephonyService {
   constructor() {
-    this.adapters = {
-      mock: new MockTelephonyAdapter(),
-      twilio: new TwilioAdapter()
-    };
+    this.adapters = { mock: new MockTelephonyAdapter(), twilio: new TwilioAdapter() };
     this.activeProvider = 'mock';
   }
-
   setProvider(provider) {
-    if (this.adapters[provider]) {
-      this.activeProvider = provider;
-    }
+    if (this.adapters[provider]) this.activeProvider = provider;
   }
-
-  getProvider() {
-    return this.adapters[this.activeProvider];
-  }
-
-  dial(phoneNumber, callbacks) {
-    this.getProvider().dial(phoneNumber, callbacks);
-  }
-
-  hangup() {
-    this.getProvider().hangup();
-  }
-
-  getLogs(phoneNumber) {
-    return this.getProvider().getLogs(phoneNumber);
-  }
+  getProvider() { return this.adapters[this.activeProvider]; }
+  dial(phoneNumber, callbacks) { this.getProvider().dial(phoneNumber, callbacks); }
+  hangup() { this.getProvider().hangup(); }
+  setAudioInputStream(stream) { this.getProvider().setAudioInputStream(stream); }
+  getLogs(phoneNumber) { return this.getProvider().getLogs(phoneNumber); }
 }
 
 export const telephonyService = new TelephonyService();

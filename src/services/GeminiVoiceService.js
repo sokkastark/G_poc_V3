@@ -12,6 +12,7 @@ class GeminiVoiceService {
     this.activeSources = [];
     this.currentAgentTranscript = "";
     this.recordDestination = null;
+    this.agentAudioDestination = null;
     this.mediaRecorder = null;
     this.recordedChunks = [];
     this.onRecordingComplete = null;
@@ -19,12 +20,9 @@ class GeminiVoiceService {
 
   isSupported() { return !!(window.AudioContext || window.webkitAudioContext); }
 
-  startSession(apiKey, queueItem, systemInstructions, callbacks) {
+  startSession(apiKey, queueItem, systemInstructions, callbacks, customInputStream) {
     const { onCallStateChange, onError } = callbacks;
-    if (!apiKey) {
-      onError?.("Gemini API Key is missing in Settings.");
-      return;
-    }
+    if (!apiKey) return onError?.("Gemini API Key is missing in Settings.");
     onCallStateChange('calling');
     this.onRecordingComplete = callbacks.onRecordingComplete;
     const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
@@ -45,7 +43,7 @@ class GeminiVoiceService {
     this.ws.onopen = async () => {
       try {
         this.ws.send(JSON.stringify(this.buildSetupMessage(queueItem, systemInstructions)));
-        await this.startRecording();
+        await this.startRecording(customInputStream);
         onCallStateChange('speaking');
       } catch (err) {
         onError?.("Failed to start voice stream: " + err.message);
@@ -61,11 +59,7 @@ class GeminiVoiceService {
     };
 
     this.ws.onerror = () => onError?.("Gemini connection error occurred.");
-
-    this.ws.onclose = (e) => {
-      this.cleanup(); 
-      onCallStateChange('ended');
-    };
+    this.ws.onclose = () => { this.cleanup(); onCallStateChange('ended'); };
   }
 
   endSession() { this.ws?.close(); this.ws = null; this.cleanup(); }
@@ -73,13 +67,11 @@ class GeminiVoiceService {
   cleanup() {
     if (this.scriptProcessor) { this.scriptProcessor.disconnect(); this.scriptProcessor = null; }
     this.stopPlayback();
-
     const closeContexts = () => {
       if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
       if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
       if (this.playbackContext) { this.playbackContext.close(); this.playbackContext = null; }
     };
-
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.onstop = () => {
         const blob = new Blob(this.recordedChunks, { type: this.mediaRecorder?.mimeType || 'audio/webm' });
@@ -90,16 +82,15 @@ class GeminiVoiceService {
         };
         reader.readAsDataURL(blob);
       };
-      try { this.mediaRecorder.stop(); } catch (err) { console.debug("Recorder stop failed", err); closeContexts(); }
+      try { this.mediaRecorder.stop(); } catch (err) { closeContexts(); }
       this.mediaRecorder = null;
-    } else {
-      closeContexts();
-    }
+    } else { closeContexts(); }
   }
 
-  async startRecording() {
-    this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  async startRecording(customInputStream) {
+    this.mediaStream = customInputStream || await navigator.mediaDevices.getUserMedia({ audio: true });
     this.recordDestination = this.playbackContext.createMediaStreamDestination();
+    this.agentAudioDestination = this.playbackContext.createMediaStreamDestination();
     const micSource = this.playbackContext.createMediaStreamSource(this.mediaStream);
     micSource.connect(this.recordDestination);
 
@@ -129,6 +120,10 @@ class GeminiVoiceService {
     };
   }
 
+  getAudioOutputStream() {
+    return this.agentAudioDestination ? this.agentAudioDestination.stream : null;
+  }
+
   playPCMChunk(base64Data) {
     if (!this.playbackContext) return;
     const pcm16 = new Int16Array(base64ToArrayBuffer(base64Data)), f32 = new Float32Array(pcm16.length);
@@ -139,6 +134,7 @@ class GeminiVoiceService {
     src.buffer = buf;
     src.connect(this.playbackContext.destination);
     if (this.recordDestination) src.connect(this.recordDestination);
+    if (this.agentAudioDestination) src.connect(this.agentAudioDestination);
     src.onended = () => {
       const idx = this.activeSources.indexOf(src);
       if (idx > -1) this.activeSources.splice(idx, 1);
@@ -151,7 +147,7 @@ class GeminiVoiceService {
   }
 
   stopPlayback() {
-    this.activeSources.forEach(s => { try { s.stop(); } catch (err) { console.debug("Buffer source stop failed", err); } });
+    this.activeSources.forEach(s => { try { s.stop(); } catch (err) {} });
     this.activeSources = []; this.nextPlayTime = 0;
   }
 
@@ -188,7 +184,6 @@ class GeminiVoiceService {
         onCallStateChange('listening');
       }
     }
-
     if (msg.toolCall?.functionCalls) {
       msg.toolCall.functionCalls.forEach(fn => {
         onFunctionCall?.(fn.name, fn.args);
@@ -235,4 +230,5 @@ class GeminiVoiceService {
 
 export const geminiVoiceService = new GeminiVoiceService();
 export default geminiVoiceService;
+
 

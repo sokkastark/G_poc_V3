@@ -22,18 +22,19 @@ export function useCampaign() {
 
   const activeFlow = ConversationFlowServiceV2.getFlowById(activeFlowId);
 
-  const handleOutcomeCaptured = useCallback((itemId, outcome) => {
+  const handleOutcomeCaptured = useCallback((itemId, outcome, duration = null) => {
     setQueue(prev => {
       const item = prev.find(i => i.id === itemId);
       if (!item) return prev;
       import('../services/WorkflowEngine').then(({ WorkflowEngine }) => {
-        const next = prev.map(i => i.id === itemId ? WorkflowEngine.processCallOutcome(item, outcome) : i);
+        const next = prev.map(i => i.id === itemId ? WorkflowEngine.processCallOutcome(item, outcome, 2, duration) : i);
         db.setAppointments(next);
         setQueue(next);
       });
       return prev;
     });
   }, []);
+
 
   const {
     callState, transcript, detectedIntent, activeItem, speechError, telephonyLogs,

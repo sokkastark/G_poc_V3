@@ -172,15 +172,18 @@ export class WorkflowEngine {
   /**
    * Handle retry and call outcome state transitions.
    */
-  static processCallOutcome(queueItem, outcome, maxAttempts = 2) {
+  static processCallOutcome(queueItem, outcome, maxAttempts = 2, duration = null) {
     const updated = { ...queueItem };
     updated.attempts += 1;
     updated.outcome = outcome;
+    if (duration !== null) {
+      updated.lastCallDuration = duration;
+    }
     
     const timestamp = new Date().toLocaleTimeString();
     updated.history = [
       ...updated.history,
-      { timestamp, outcome, attempt: updated.attempts }
+      { timestamp, outcome, attempt: updated.attempts, duration }
     ];
 
     if (outcome === 'No Answer' || outcome === 'Left Message') {
@@ -200,4 +203,5 @@ export class WorkflowEngine {
 }
 
 export default WorkflowEngine;
+
 
