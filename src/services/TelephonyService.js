@@ -74,7 +74,10 @@ class TwilioAdapter {
       this.activeCall = call;
       call.on('accept', () => {
         onStatusChange("in-progress");
-        onConnect?.({ id: call.parameters.CallSid || `twilio-${Date.now()}`, remoteStream: call.getRemoteStream() });
+        call.on('audio', (remoteAudioElement) => {
+          const remoteStream = remoteAudioElement ? remoteAudioElement.srcObject : null;
+          onConnect?.({ id: call.parameters.CallSid || `twilio-${Date.now()}`, remoteStream });
+        });
       });
       call.on('disconnect', () => {
         onStatusChange("ended");

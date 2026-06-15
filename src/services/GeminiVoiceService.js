@@ -20,12 +20,11 @@ class GeminiVoiceService {
 
   isSupported() { return !!(window.AudioContext || window.webkitAudioContext); }
 
-  startSession(apiKey, queueItem, systemInstructions, callbacks, customInputStream, autoStart = true) {
+  startSession(apiKey, queueItem, systemInstructions, callbacks, customInputStream) {
     const { onCallStateChange, onError } = callbacks;
     if (!apiKey) return onError?.("Gemini API Key is missing in Settings.");
     onCallStateChange('calling');
     this.onRecordingComplete = callbacks.onRecordingComplete;
-    this.autoStart = autoStart;
     const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
     try {
@@ -160,10 +159,7 @@ class GeminiVoiceService {
 
   handleMessage(msg, callbacks) {
     const { onTranscriptUpdate, onFunctionCall, onCallStateChange } = callbacks;
-    if (msg.setupComplete) {
-      if (this.autoStart) this.sendInitialGreeting();
-      return;
-    }
+    if (msg.setupComplete) return this.sendInitialGreeting();
     if (msg.serverContent) {
       const c = msg.serverContent;
       if (c.interrupted) {

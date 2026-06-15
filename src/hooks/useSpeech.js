@@ -12,7 +12,6 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
   const [activeItem, setActiveItem] = useState(null);
   const [speechError, setSpeechError] = useState(null);
   const [telephonyLogs, setTelephonyLogs] = useState([]);
-  const [isAiStarted, setIsAiStarted] = useState(false);
 
   const activeItemRef = useRef(null);
   const activeFlowRef = useRef(activeFlow);
@@ -22,12 +21,6 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
   const callStartTimeRef = useRef(null);
   const callConnectedTimeRef = useRef(null);
   const outcomeCapturedRef = useRef(false);
-
-  const activateAi = useCallback(() => {
-    setIsAiStarted(true);
-    geminiVoiceService.sendInitialGreeting();
-    setTranscript(prev => [...prev, { id: `tr-ai-start-${Date.now()}`, role: 'system', message: 'Guardian Agent Activated', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-  }, []);
 
   useEffect(() => {
     activeItemRef.current = activeItem;
@@ -116,8 +109,6 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
     callStartTimeRef.current = Date.now();
     callConnectedTimeRef.current = null;
     outcomeCapturedRef.current = false;
-    const isMock = telephonyService.activeProvider === 'mock';
-    setIsAiStarted(isMock);
 
     db.addActivityLog(`Call started to ${queueItem.patientName} (${queueItem.phone})`);
     const logs = telephonyService.getLogs(queueItem.phone);
@@ -171,7 +162,7 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
             onOutcomeCapturedRef.current?.(queueItem.id, 'No Answer', duration);
             setTimeout(() => { setCallState('idle'); setActiveItem(null); }, 2000);
           }
-        }, session?.remoteStream, isMock);
+        }, session?.remoteStream);
 
         const geminiStream = geminiVoiceService.getAudioOutputStream();
         if (geminiStream) telephonyService.setAudioInputStream(geminiStream);
@@ -199,7 +190,7 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
   }
 
   return {
-    callState, transcript, detectedIntent, activeItem, speechError, telephonyLogs, startCall, endCall, isAiStarted, activateAi
+    callState, transcript, detectedIntent, activeItem, speechError, telephonyLogs, startCall, endCall
   };
 }
 export default useSpeech;
