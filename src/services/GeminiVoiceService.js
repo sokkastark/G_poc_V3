@@ -96,13 +96,19 @@ class GeminiVoiceService {
   }
 
   async startRecording(customInputStream, isTwilioMode) {
-    if (isTwilioMode) {
-      if (!customInputStream) {
-        throw new Error("No remote audio stream available from Twilio.");
-      }
+    if (customInputStream) {
+      // Use the provided stream directly (Twilio remote stream or other)
       this.mediaStream = customInputStream;
+      console.log('[Gemini] Using provided remote stream as audio input.');
+    } else if (isTwilioMode) {
+      // Twilio remote stream was unavailable — fall back to getUserMedia.
+      // Gemini will hear the call audio playing through the headset/speaker (loopback).
+      // The 28-second guard timer (TWILIO_GUARD_MS) prevents it from acting on
+      // Twilio's trial warning or ringing sounds during this phase.
+      console.warn('[Gemini] Twilio remote stream unavailable. Falling back to getUserMedia (loopback mode). Guard timer active.');
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } else {
-      this.mediaStream = customInputStream || await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     }
     this.recordDestination = this.playbackContext.createMediaStreamDestination();
     this.agentAudioDestination = this.playbackContext.createMediaStreamDestination();

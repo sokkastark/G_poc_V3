@@ -74,10 +74,33 @@ class TwilioAdapter {
       this.activeCall = call;
       call.on('accept', () => {
         onStatusChange("in-progress");
-        call.on('audio', (remoteAudioElement) => {
-          const remoteStream = remoteAudioElement ? remoteAudioElement.srcObject : null;
-          onConnect?.({ id: call.parameters.CallSid || `twilio-${Date.now()}`, remoteStream });
-        });
+        // Twilio does not expose a simple 'audio' event. We attempt multiple strategies
+        // to obtain the remote MediaStream from this WebRTC call:
+        // 1) call.getRemoteStream() (Twilio SDK v2 internal helper)
+        // 2) Scan the DOM for Twilio's hidden <audio> element with srcObject set
+        // 3) Fall back to null — GeminiVoiceService will then use getUserMedia
+        const tryGetRemoteStream = () => {
+          // Strategy 1: SDK method (may exist on some versions)
+          if (typeof call.getRemoteStream === 'function') {
+            const s = call.getRemoteStream();
+            if (s && s.getAudioTracks().length > 0) return s;
+          }
+          // Strategy 2: DOM audio element captureStream
+          const audioEls = document.querySelectorAll('audio');
+          for (const el of audioEls) {
+            if (el.srcObject instanceof MediaStream && el.srcObject.getAudioTracks().length > 0) {
+              return typeof el.captureStream === 'function' ? el.captureStream() : el.srcObject;
+            }
+          }
+          return null;
+        };
+        // Defer slightly so WebRTC has time to attach remote tracks
+        const callId = call.parameters?.CallSid || `twilio-${Date.now()}`;
+        setTimeout(() => {
+          const remoteStream = tryGetRemoteStream();
+          console.log('[Twilio] Remote stream acquired:', remoteStream ? 'YES' : 'FALLBACK');
+          onConnect?.({ id: callId, remoteStream });
+        }, 1200);
       });
       call.on('disconnect', () => {
         onStatusChange("ended");
