@@ -70,7 +70,7 @@ class TwilioAdapter {
         else if (digits.length === 11 && digits.startsWith('1')) targetNumber = `+${digits}`;
         else targetNumber = `+${digits}`;
       }
-      const call = await this.device.connect({ params: { To: targetNumber } });
+      const call = await this.device.connect({ params: { tocall: targetNumber } });
       this.activeCall = call;
       call.on('accept', () => {
         onStatusChange("in-progress");

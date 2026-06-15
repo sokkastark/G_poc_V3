@@ -186,7 +186,7 @@ export class WorkflowEngine {
       { timestamp, outcome, attempt: updated.attempts, duration }
     ];
 
-    if (outcome === 'No Answer' || outcome === 'Left Message') {
+    if (outcome === 'No Answer' || outcome === 'Left Message' || outcome === 'Other') {
       if (updated.attempts < maxAttempts) {
         updated.status = 'Retry Scheduled';
       } else {

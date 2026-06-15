@@ -13,7 +13,7 @@ export default function handler(req, res) {
   }
 
   // Twilio callback requests can be POST or GET
-  const To = req.body.To || req.query.To;
+  const To = req.body.tocall || req.query.tocall || req.body.To || req.query.To;
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const response = new VoiceResponse();
 
