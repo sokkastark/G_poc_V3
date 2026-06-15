@@ -184,8 +184,13 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
   }
 
   function endCall() {
+    // Immediately clear silence timers and reset refs so the UI responds instantly
+    clearSilenceTimer();
     const duration = getDuration();
     const item = activeItemRef.current;
+    // Clear the ref immediately to prevent double-calls
+    activeItemRef.current = null;
+    callConnectedTimeRef.current = null;
     if (item && !outcomeCapturedRef.current) {
       outcomeCapturedRef.current = true;
       const finalOutcome = callConnectedTimeRef.current ? 'Other' : 'No Answer';
@@ -194,9 +199,10 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
     } else if (item) {
       db.addActivityLog(`Call ended to ${item.patientName}. Duration: ${duration}s.`);
     }
-    geminiVoiceService.endSession();
+    // Hang up telephony first (kills the Twilio WebRTC call), then clean up Gemini
     telephonyService.setAudioInputStream(null);
     telephonyService.hangup();
+    geminiVoiceService.endSession();
     setCallState('ended');
     setTimeout(() => { setCallState('idle'); setActiveItem(null); }, 1500);
   }

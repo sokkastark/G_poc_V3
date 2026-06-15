@@ -13,7 +13,24 @@ export function ConsoleOverlay({
   onEndCall,
   onExecuteReschedule
 }) {
-  if (callState === 'idle') return null;
+  // If idle AND no active appointment, render nothing
+  if (callState === 'idle' && !activeApt) return null;
+
+  // If idle but we still have an activeApt, show only the force-end overlay (stuck call safety net)
+  if (callState === 'idle') {
+    return (
+      <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
+        <button
+          type="button"
+          className="btn btn-danger shadow-lg d-flex align-items-center gap-2"
+          onClick={onEndCall}
+          title="Force end any stuck call"
+        >
+          <i className="bi bi-telephone-x-fill"></i> Force End Call
+        </button>
+      </div>
+    );
+  }
 
   const getStatusColor = () => {
     switch (callState) {
@@ -28,8 +45,10 @@ export function ConsoleOverlay({
   const getStatusText = () => {
     switch (callState) {
       case 'calling': return 'DIALING PATIENT...';
+      case 'ringing': return 'RINGING - WAITING FOR ANSWER...';
       case 'speaking': return 'GUARDIAN IS SPEAKING...';
       case 'listening': return 'LISTENING FOR RESPONSE...';
+      case 'active': return 'CALL CONNECTED - GUARDIAN ACTIVE';
       case 'ended': return 'CALL COMPLETED';
       default: return callState.toUpperCase();
     }

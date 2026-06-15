@@ -1,6 +1,10 @@
 // GeminiVoiceService.js - Connects to Gemini Live API dynamically using systemInstructions from Configurable Flows
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../utils/audioUtils';
 
+// TWILIO_GUARD_MS: Minimum milliseconds after session start before wrong_number/hang_up are allowed.
+// This prevents Gemini from treating the Twilio trial warning and ringing as an IVR and hanging up prematurely.
+const TWILIO_GUARD_MS = 28000;
+
 class GeminiVoiceService {
   constructor() {
     this.ws = null;
@@ -16,6 +20,8 @@ class GeminiVoiceService {
     this.mediaRecorder = null;
     this.recordedChunks = [];
     this.onRecordingComplete = null;
+    this.sessionStartTime = null; // tracks when session started for guard logic
+    this.isTwilioMode = false;    // flag to enable the Twilio guard
   }
 
   isSupported() { return !!(window.AudioContext || window.webkitAudioContext); }
@@ -25,6 +31,8 @@ class GeminiVoiceService {
     if (!apiKey) return onError?.("Gemini API Key is missing in Settings.");
     onCallStateChange('calling');
     this.onRecordingComplete = callbacks.onRecordingComplete;
+    this.sessionStartTime = Date.now();
+    this.isTwilioMode = !!isTwilioMode;
     const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
     try {
@@ -192,7 +200,19 @@ class GeminiVoiceService {
       }
     }
     if (msg.toolCall?.functionCalls) {
+      const elapsedMs = this.sessionStartTime ? Date.now() - this.sessionStartTime : Infinity;
+      const guardActive = this.isTwilioMode && elapsedMs < TWILIO_GUARD_MS;
       msg.toolCall.functionCalls.forEach(fn => {
+        // In Twilio mode, block wrong_number and hang_up during the guard window
+        // so the Twilio trial warning + ringing tones don't fool Gemini into hanging up.
+        if (guardActive && (fn.name === 'wrong_number' || fn.name === 'hang_up')) {
+          console.warn(`[Guardian] Blocked premature ${fn.name} call at ${Math.round(elapsedMs/1000)}s (guard active for ${TWILIO_GUARD_MS/1000}s)`);
+          // Still send tool response to keep Gemini alive, but suppress the UI action
+          this.ws?.readyState === 1 && this.ws.send(JSON.stringify({
+            toolResponse: { functionResponses: [{ response: { output: { status: "blocked_guard", reason: "Twilio warning phase, call not yet connected to patient." } }, id: fn.id }] }
+          }));
+          return;
+        }
         onFunctionCall?.(fn.name, fn.args);
         this.ws?.readyState === 1 && this.ws.send(JSON.stringify({
           toolResponse: { functionResponses: [{ response: { output: { status: "success" } }, id: fn.id }] }
