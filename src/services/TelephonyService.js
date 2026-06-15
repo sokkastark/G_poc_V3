@@ -86,9 +86,23 @@ class TwilioAdapter {
 
       await this.device.register();
 
-      // 3. Connect outbound call
+      // 3. Connect outbound call (normalize to E.164 format with international prefix)
+      let targetNumber = phoneNumber.trim();
+      const digits = targetNumber.replace(/\D/g, '');
+      if (!targetNumber.startsWith('+')) {
+        if (digits.length === 10) {
+          targetNumber = `+91${digits}`;
+        } else if (digits.length === 12 && digits.startsWith('91')) {
+          targetNumber = `+${digits}`;
+        } else if (digits.length === 11 && digits.startsWith('1')) {
+          targetNumber = `+${digits}`;
+        } else {
+          targetNumber = `+${digits}`;
+        }
+      }
+
       const call = await this.device.connect({
-        params: { To: phoneNumber }
+        params: { To: targetNumber }
       });
 
       this.activeCall = call;
