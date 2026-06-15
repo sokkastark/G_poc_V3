@@ -33,7 +33,10 @@ export default function handler(req, res) {
   if (!To) {
     response.say("Error: No recipient phone number provided.");
   } else {
-    const dial = response.dial({ callerId: process.env.TWILIO_CALLER_ID });
+    const dial = response.dial({
+      callerId: process.env.TWILIO_CALLER_ID,
+      answerOnBridge: 'true'
+    });
     dial.number(To);
   }
 
