@@ -78,6 +78,10 @@ class GeminiVoiceService {
   endSession() { this.ws?.close(); this.ws = null; this.cleanup(); }
 
   cleanup() {
+    if (this._silentContext) {
+      try { this._silentContext.close(); } catch (e) {}
+      this._silentContext = null;
+    }
     if (this.scriptProcessor) { this.scriptProcessor.disconnect(); this.scriptProcessor = null; }
     this.stopPlayback();
     const closeContexts = () => {
@@ -102,16 +106,18 @@ class GeminiVoiceService {
 
   async startRecording(customInputStream, isTwilioMode) {
     if (customInputStream) {
-      // Use the provided stream directly (Twilio remote stream or other)
+      // Best case: use the Twilio remote stream (patient's audio from phone)
       this.mediaStream = customInputStream;
-      console.log('[Gemini] Using provided remote stream as audio input.');
+      console.log('[Gemini] Using Twilio remote audio stream as input ✓');
     } else if (isTwilioMode) {
-      // Twilio remote stream was unavailable — fall back to getUserMedia.
-      // Gemini will hear the call audio playing through the headset/speaker (loopback).
-      // The 28-second guard timer (TWILIO_GUARD_MS) prevents it from acting on
-      // Twilio's trial warning or ringing sounds during this phase.
-      console.warn('[Gemini] Twilio remote stream unavailable. Falling back to getUserMedia (loopback mode). Guard timer active.');
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Remote stream not available (call unreachable, busy, or WebRTC not ready).
+      // NEVER call getUserMedia in Twilio mode — no one is speaking from the browser.
+      // Use a silent AudioContext stream so Gemini starts without a mic prompt.
+      console.warn('[Gemini] Twilio mode: no remote stream. Using silent input (no browser mic).');
+      const SilentAC = window.AudioContext || window.webkitAudioContext;
+      this._silentContext = new SilentAC({ sampleRate: 16000 });
+      const silentDest = this._silentContext.createMediaStreamDestination();
+      this.mediaStream = silentDest.stream;
     } else {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     }

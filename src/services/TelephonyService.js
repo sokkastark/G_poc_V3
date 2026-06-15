@@ -75,61 +75,51 @@ class TwilioAdapter {
       call.on('accept', () => {
         onStatusChange("in-progress");
         const callId = call.parameters?.CallSid || `twilio-${Date.now()}`;
-        // Store call ref for stream detection
-        this._pendingCall = call;
-        
-        // Strategy: Get Twilio remote audio stream via 3 escalating approaches.
-        // We wait 1500ms so WebRTC has time to negotiate and attach remote tracks.
-        const tryGetRemoteStream = () => {
-          // Strategy 1 (BEST): Access the RTCPeerConnection receivers directly from Twilio internals.
-          // This gives us the raw MediaStream from the remote phone leg.
-          try {
-            const pc = call._mediaHandler?.version?.pc
-                     || call._mediaHandler?._pc
-                     || call._peerConnection;
-            if (pc && typeof pc.getReceivers === 'function') {
-              const tracks = pc.getReceivers().map(r => r.track).filter(Boolean);
-              if (tracks.length > 0) {
-                console.log('[Twilio] Remote stream via RTCPeerConnection receivers ✓');
-                return new MediaStream(tracks);
-              }
-            }
-          } catch (e) { console.warn('[Twilio] RTCPeerConnection strategy failed:', e.message); }
+        let resolved = false;
 
-          // Strategy 2: Scan DOM for Twilio's hidden <audio> element with srcObject set
-          try {
-            const audioEls = document.querySelectorAll('audio');
-            for (const el of audioEls) {
-              if (el.srcObject instanceof MediaStream) {
-                const tracks = el.srcObject.getTracks();
-                if (tracks.length > 0) {
-                  console.log('[Twilio] Remote stream via DOM audio element ✓');
-                  return typeof el.captureStream === 'function' ? el.captureStream() : el.srcObject;
-                }
-              }
-            }
-          } catch (e) {}
-
-          // Strategy 3: SDK method (may exist on some versions)
-          try {
-            if (typeof call.getRemoteStream === 'function') {
-              const s = call.getRemoteStream();
-              if (s && s.getTracks().length > 0) {
-                console.log('[Twilio] Remote stream via call.getRemoteStream() ✓');
-                return s;
-              }
-            }
-          } catch (e) {}
-
-          console.warn('[Twilio] No remote stream found. Gemini will use browser mic as fallback.');
-          return null;
+        // Resolve once — called with remoteStream (or null if unreachable/timeout)
+        const finish = (stream) => {
+          if (resolved) return;
+          resolved = true;
+          console.log('[Twilio] onConnect with remote stream:', stream ? 'YES ✓' : 'NULL (silent mode)');
+          onConnect?.({ id: callId, remoteStream: stream });
         };
 
-        setTimeout(() => {
-          const remoteStream = tryGetRemoteStream();
-          onConnect?.({ id: callId, remoteStream });
-        }, 1500);
+        // Attach ontrack listener to RTCPeerConnection.
+        // This event fires exactly when Twilio negotiates the remote audio track.
+        const attachTrackListener = () => {
+          const pc = call._mediaHandler?.version?.pc
+                   || call._mediaHandler?._pc
+                   || call._peerConnection
+                   || call._mediaHandler?.peerConnection;
+          if (!pc) return false;
+          // Check if tracks already exist (call was fast)
+          const existing = (pc.getReceivers?.() || [])
+            .map(r => r.track).filter(t => t?.kind === 'audio');
+          if (existing.length) {
+            finish(new MediaStream(existing));
+            return true;
+          }
+          // Listen for the remote audio track
+          pc.addEventListener('track', (ev) => {
+            const s = ev.streams?.[0] || (ev.track ? new MediaStream([ev.track]) : null);
+            if (s) finish(s);
+          });
+          return true;
+        };
+
+        // Try immediately; if PC not ready yet, poll briefly (max 3s)
+        if (!attachTrackListener()) {
+          let ticks = 0;
+          const poll = setInterval(() => {
+            if (attachTrackListener() || ++ticks > 30) clearInterval(poll);
+          }, 100);
+        }
+
+        // 5-second hard timeout → null stream (unreachable, busy, no audio)
+        setTimeout(() => finish(null), 5000);
       });
+
       call.on('disconnect', () => {
         onStatusChange("ended");
         onDisconnect?.();
