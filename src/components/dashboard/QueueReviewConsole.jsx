@@ -202,7 +202,7 @@ export function QueueReviewConsole({
                           <button
                             type="button"
                             className={`btn btn-xs ${isActive ? 'btn-warning' : 'btn-primary'} d-flex align-items-center gap-1`}
-                            disabled={callState !== 'idle' || item.status === 'Completed' || item.status === 'Failed'}
+                            disabled={callState !== 'idle'}
                             onClick={() => onStartCall(item)}
                           >
                             <i className="bi bi-telephone-outbound-fill" style={{ fontSize: '0.75rem' }}></i>
