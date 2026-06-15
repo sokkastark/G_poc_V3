@@ -88,9 +88,10 @@ class TwilioAdapter {
       });
       onStatusChange("ringing");
     } catch (err) {
-      console.warn("[Twilio] Real calling failed or not configured, falling back to Mock Telephony:", err.message);
-      this.fallbackAdapter = new MockTelephonyAdapter();
-      this.fallbackAdapter.dial(phoneNumber, callbacks);
+      console.error("[Twilio] Real calling failed:", err.message);
+      onStatusChange("ended");
+      onDisconnect?.();
+      callbacks.onError?.(err.message);
     }
   }
   hangup() {

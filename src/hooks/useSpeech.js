@@ -119,6 +119,11 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
         setCallState(status);
         setTelephonyLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `Telephony Status: ${status.toUpperCase()}` }]);
       },
+      onError: (err) => {
+        setSpeechError("Telephony Error: " + err);
+        setTelephonyLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), message: `Telephony Error: ${err}` }]);
+        onOutcomeCapturedRef.current?.(queueItem.id, 'No Answer', 0);
+      },
       onConnect: (session) => {
         setCallState('active');
         callConnectedTimeRef.current = Date.now();
