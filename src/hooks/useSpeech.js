@@ -130,6 +130,9 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
         db.addActivityLog(`Call connected to ${queueItem.patientName}`);
         const flow = activeFlowRef.current;
         const slotsDesc = "ID: slot-1: Monday 10:00 AM, ID: slot-2: Monday 12:00 PM, ID: slot-3: Tuesday 09:00 AM";
+        const isMock = telephonyService.activeProvider === 'mock';
+        const waitRule = isMock ? '' : '- CRITICAL: DO NOT speak first. Remain silent and wait until the patient answers and speaks (e.g. says "Hello?"). Once you hear them speak, respond with the Greeting.';
+        
         const instruction = `
           You are "Guardian", a warm, empathetic care coordinator. Calling regarding "${flow.name}" for patient "${queueItem.patientName}".
           Greeting: "${flow.initialGreeting(queueItem.patientName)}"
@@ -137,6 +140,7 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
           ${Object.entries(flow.steps).map(([k, s]) => `- ${k}: "${s.question}"`).join('\n')}
           Reschedule Slots: ${slotsDesc}
           Rules:
+          ${waitRule}
           - Speak naturally. Keep responses short (1-2 sentences).
           - Map patient replies to these tools:
             - Confirm -> "confirm_appointment"
