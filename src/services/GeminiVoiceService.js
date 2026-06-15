@@ -111,25 +111,36 @@ class GeminiVoiceService {
 
     if (isTwilioMode) {
       // ─── TWILIO MODE ───────────────────────────────────────────────────────────
-      // NO browser mic. NO playbackContext stream source from phone audio.
-      // Only route patient's WebRTC audio through audioContext (16kHz) → Gemini.
-      // agentAudioDestination carries Gemini's response back to the phone via Twilio AudioProcessor.
+      // Output destination for Gemini's audio (routed to Twilio)
+      this.agentAudioDestination = this.playbackContext.createMediaStreamDestination();
+      // Separate destination used for call recording
+      this.recordDestination = this.playbackContext.createMediaStreamDestination();
+
+      this.recordedChunks = [];
+      try { this.mediaRecorder = new MediaRecorder(this.recordDestination.stream, { mimeType: 'audio/webm' }); }
+      catch (e) { this.mediaRecorder = new MediaRecorder(this.recordDestination.stream); }
+      this.mediaRecorder.ondataavailable = (e) => { if (e.data?.size > 0) this.recordedChunks.push(e.data); };
+      this.mediaRecorder.start();
+
       if (customInputStream && customInputStream.getAudioTracks().length > 0) {
         this.mediaStream = customInputStream;
         try {
           const src = this.audioContext.createMediaStreamSource(this.mediaStream);
-          this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+          this.scriptProcessor = this.audioContext.createScriptProcessor(1024, 1, 1);
           src.connect(this.scriptProcessor);
           this.scriptProcessor.connect(this.audioContext.destination);
           this.scriptProcessor.onaudioprocess = this._makePCMSender();
           console.log('[Gemini] Twilio: remote audio input → Gemini ✓');
+
+          // Route patient's WebRTC audio to recordDestination so it's captured in the recording
+          const recordSrc = this.playbackContext.createMediaStreamSource(this.mediaStream);
+          recordSrc.connect(this.recordDestination);
         } catch (e) {
-          console.warn('[Gemini] Twilio: could not connect remote stream (speak-only mode):', e.message);
+          console.warn('[Gemini] Twilio: could not connect remote stream:', e.message);
         }
       } else {
         console.log('[Gemini] Twilio: no remote audio available. Guardian speaks only.');
       }
-      this.mediaRecorder = null; // No call recording in Twilio mode
       return;
     }
 
@@ -151,7 +162,7 @@ class GeminiVoiceService {
     this.mediaRecorder.ondataavailable = (e) => { if (e.data?.size > 0) this.recordedChunks.push(e.data); };
     this.mediaRecorder.start();
     const src = this.audioContext.createMediaStreamSource(this.mediaStream);
-    this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+    this.scriptProcessor = this.audioContext.createScriptProcessor(1024, 1, 1);
     src.connect(this.scriptProcessor);
     this.scriptProcessor.connect(this.audioContext.destination);
     this.scriptProcessor.onaudioprocess = this._makePCMSender();

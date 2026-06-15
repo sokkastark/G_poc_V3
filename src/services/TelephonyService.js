@@ -206,20 +206,9 @@ class TwilioAdapter {
     if (stream) {
       this.currentProcessor = {
         async createProcessedStream() {
-          const AC = window.AudioContext || window.webkitAudioContext;
-          const ctx = new AC();
-          const dest = ctx.createMediaStreamDestination();
-          const source1 = ctx.createMediaStreamSource(stream);
-          source1.connect(dest);
-          this.ctx = ctx;
-          return dest.stream;
+          return stream;
         },
-        async destroyProcessedStream() {
-          if (this.ctx) {
-            await this.ctx.close();
-            this.ctx = null;
-          }
-        }
+        async destroyProcessedStream() {}
       };
       this.device.audio.addProcessor(this.currentProcessor, false);
     }
