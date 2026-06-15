@@ -1,9 +1,11 @@
 // GeminiVoiceService.js - Connects to Gemini Live API dynamically using systemInstructions from Configurable Flows
 import { arrayBufferToBase64, base64ToArrayBuffer } from '../utils/audioUtils';
 
-// TWILIO_GUARD_MS: Minimum milliseconds after session start before wrong_number/hang_up are allowed.
-// This prevents Gemini from treating the Twilio trial warning and ringing as an IVR and hanging up prematurely.
+// TWILIO_GUARD_MS: block wrong_number/hang_up calls during Twilio trial warning + ringing phase.
 const TWILIO_GUARD_MS = 28000;
+// TWILIO_INPUT_GUARD_MS: suppress audio sent to Gemini for this many ms after session start.
+// This prevents Gemini from hearing and responding to the Twilio trial warning message.
+const TWILIO_INPUT_GUARD_MS = 9000;
 
 class GeminiVoiceService {
   constructor() {
@@ -159,6 +161,13 @@ class GeminiVoiceService {
   _makePCMSender() {
     return (ev) => {
       if (this.ws?.readyState !== 1) return;
+      // In Twilio mode, suppress audio for the first TWILIO_INPUT_GUARD_MS ms.
+      // This ensures the Twilio trial warning ("This call is from a Twilio trial...")
+      // is not heard by Gemini, preventing an unwanted early response.
+      if (this.isTwilioMode && this.sessionStartTime &&
+          (Date.now() - this.sessionStartTime) < TWILIO_INPUT_GUARD_MS) {
+        return; // Drop this audio chunk — Gemini hears silence
+      }
       const input = ev.inputBuffer.getChannelData(0), pcm16 = new Int16Array(input.length);
       for (let i = 0; i < input.length; i++) {
         const s = Math.max(-1, Math.min(1, input[i]));

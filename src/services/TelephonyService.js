@@ -45,6 +45,37 @@ class TwilioAdapter {
     this.device = null;
     this.fallbackAdapter = null;
     this.currentProcessor = null;
+    this._originalGUM = null;   // saved real getUserMedia
+    this._silentGUMCtx = null;  // AudioContext for silent mic stream
+  }
+
+  // Intercept navigator.mediaDevices.getUserMedia so Twilio SDK gets a
+  // silent MediaStream instead of requesting real mic permission.
+  // In Twilio outbound-call mode, no one speaks from the browser —
+  // Gemini's voice is routed to the patient via the Twilio AudioProcessor.
+  _patchGUM() {
+    if (this._originalGUM) return;
+    this._originalGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    const self = this;
+    navigator.mediaDevices.getUserMedia = async (constraints) => {
+      if (constraints?.audio) {
+        console.log('[Twilio] getUserMedia intercepted → returning silent stream (no mic permission needed)');
+        self._silentGUMCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        return self._silentGUMCtx.createMediaStreamDestination().stream;
+      }
+      return self._originalGUM(constraints);
+    };
+  }
+
+  _restoreGUM() {
+    if (this._originalGUM) {
+      navigator.mediaDevices.getUserMedia = this._originalGUM;
+      this._originalGUM = null;
+    }
+    if (this._silentGUMCtx) {
+      try { this._silentGUMCtx.close(); } catch (e) {}
+      this._silentGUMCtx = null;
+    }
   }
   async dial(phoneNumber, callbacks) {
     const { onStatusChange, onConnect, onDisconnect } = callbacks;
@@ -70,6 +101,10 @@ class TwilioAdapter {
         else if (digits.length === 11 && digits.startsWith('1')) targetNumber = `+${digits}`;
         else targetNumber = `+${digits}`;
       }
+      // Patch getUserMedia BEFORE device.connect() so Twilio SDK never
+      // requests real mic permission. The silent stream is used as the
+      // "local mic" while Gemini's audio reaches the patient via AudioProcessor.
+      this._patchGUM();
       const call = await this.device.connect({ params: { tocall: targetNumber } });
       this.activeCall = call;
       call.on('accept', () => {
@@ -139,6 +174,7 @@ class TwilioAdapter {
     }
   }
   hangup() {
+    this._restoreGUM(); // Always restore getUserMedia on hangup
     if (this.fallbackAdapter) {
       this.fallbackAdapter.hangup();
       this.fallbackAdapter = null;
