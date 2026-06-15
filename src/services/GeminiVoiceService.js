@@ -78,14 +78,14 @@ class GeminiVoiceService {
   endSession() { this.ws?.close(); this.ws = null; this.cleanup(); }
 
   cleanup() {
-    if (this._silentContext) {
-      try { this._silentContext.close(); } catch (e) {}
-      this._silentContext = null;
-    }
     if (this.scriptProcessor) { this.scriptProcessor.disconnect(); this.scriptProcessor = null; }
     this.stopPlayback();
     const closeContexts = () => {
-      if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
+      // Only stop tracks WE acquired (browser getUserMedia). NEVER stop WebRTC remote tracks.
+      if (this.mediaStream && !this.isTwilioMode) {
+        this.mediaStream.getTracks().forEach(t => t.stop());
+      }
+      this.mediaStream = null;
       if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
       if (this.playbackContext) { this.playbackContext.close(); this.playbackContext = null; }
     };
@@ -93,10 +93,7 @@ class GeminiVoiceService {
       this.mediaRecorder.onstop = () => {
         const blob = new Blob(this.recordedChunks, { type: this.mediaRecorder?.mimeType || 'audio/webm' });
         const reader = new FileReader();
-        reader.onloadend = () => {
-          if (this.onRecordingComplete) this.onRecordingComplete(reader.result);
-          closeContexts();
-        };
+        reader.onloadend = () => { if (this.onRecordingComplete) this.onRecordingComplete(reader.result); closeContexts(); };
         reader.readAsDataURL(blob);
       };
       try { this.mediaRecorder.stop(); } catch (err) { closeContexts(); }
@@ -105,50 +102,69 @@ class GeminiVoiceService {
   }
 
   async startRecording(customInputStream, isTwilioMode) {
-    if (customInputStream) {
-      // Best case: use the Twilio remote stream (patient's audio from phone)
-      this.mediaStream = customInputStream;
-      console.log('[Gemini] Using Twilio remote audio stream as input ✓');
-    } else if (isTwilioMode) {
-      // Remote stream not available (call unreachable, busy, or WebRTC not ready).
-      // NEVER call getUserMedia in Twilio mode — no one is speaking from the browser.
-      // Use a silent AudioContext stream so Gemini starts without a mic prompt.
-      console.warn('[Gemini] Twilio mode: no remote stream. Using silent input (no browser mic).');
-      const SilentAC = window.AudioContext || window.webkitAudioContext;
-      this._silentContext = new SilentAC({ sampleRate: 16000 });
-      const silentDest = this._silentContext.createMediaStreamDestination();
-      this.mediaStream = silentDest.stream;
-    } else {
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-    this.recordDestination = this.playbackContext.createMediaStreamDestination();
+    // Output destination for Gemini's audio (routed to Twilio OR browser speakers)
     this.agentAudioDestination = this.playbackContext.createMediaStreamDestination();
-    const micSource = this.playbackContext.createMediaStreamSource(this.mediaStream);
-    micSource.connect(this.recordDestination);
+    // Separate destination used only in Mock mode for call recording
+    this.recordDestination = this.playbackContext.createMediaStreamDestination();
 
-    this.recordedChunks = [];
-    try {
-      this.mediaRecorder = new MediaRecorder(this.recordDestination.stream, { mimeType: 'audio/webm' });
-    } catch (err) {
-      this.mediaRecorder = new MediaRecorder(this.recordDestination.stream);
+    if (isTwilioMode) {
+      // ─── TWILIO MODE ───────────────────────────────────────────────────────────
+      // NO browser mic. NO playbackContext stream source from phone audio.
+      // Only route patient's WebRTC audio through audioContext (16kHz) → Gemini.
+      // agentAudioDestination carries Gemini's response back to the phone via Twilio AudioProcessor.
+      if (customInputStream && customInputStream.getAudioTracks().length > 0) {
+        this.mediaStream = customInputStream;
+        try {
+          const src = this.audioContext.createMediaStreamSource(this.mediaStream);
+          this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+          src.connect(this.scriptProcessor);
+          this.scriptProcessor.connect(this.audioContext.destination);
+          this.scriptProcessor.onaudioprocess = this._makePCMSender();
+          console.log('[Gemini] Twilio: remote audio input → Gemini ✓');
+        } catch (e) {
+          console.warn('[Gemini] Twilio: could not connect remote stream (speak-only mode):', e.message);
+        }
+      } else {
+        console.log('[Gemini] Twilio: no remote audio available. Guardian speaks only.');
+      }
+      this.mediaRecorder = null; // No call recording in Twilio mode
+      return;
     }
-    this.mediaRecorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) this.recordedChunks.push(e.data);
-    };
-    this.mediaRecorder.start();
 
+    // ─── MOCK / BROWSER MODE ───────────────────────────────────────────────────
+    // Use browser microphone. Show clear guidance if permission is denied.
+    try {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+      throw new Error(isDenied
+        ? 'Microphone access blocked. Click the 🔒 lock icon in the browser address bar → allow microphone → retry.'
+        : err.message);
+    }
+    const micSrc = this.playbackContext.createMediaStreamSource(this.mediaStream);
+    micSrc.connect(this.recordDestination);
+    this.recordedChunks = [];
+    try { this.mediaRecorder = new MediaRecorder(this.recordDestination.stream, { mimeType: 'audio/webm' }); }
+    catch (e) { this.mediaRecorder = new MediaRecorder(this.recordDestination.stream); }
+    this.mediaRecorder.ondataavailable = (e) => { if (e.data?.size > 0) this.recordedChunks.push(e.data); };
+    this.mediaRecorder.start();
     const src = this.audioContext.createMediaStreamSource(this.mediaStream);
-    this.scriptProcessor = this.audioContext.createScriptProcessor(2048, 1, 1);
+    this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
     src.connect(this.scriptProcessor);
     this.scriptProcessor.connect(this.audioContext.destination);
-    this.scriptProcessor.onaudioprocess = (ev) => {
+    this.scriptProcessor.onaudioprocess = this._makePCMSender();
+  }
+
+  // Returns an onaudioprocess handler that encodes PCM and sends to Gemini WebSocket
+  _makePCMSender() {
+    return (ev) => {
       if (this.ws?.readyState !== 1) return;
       const input = ev.inputBuffer.getChannelData(0), pcm16 = new Int16Array(input.length);
       for (let i = 0; i < input.length; i++) {
         const s = Math.max(-1, Math.min(1, input[i]));
         pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
-      this.ws.send(JSON.stringify({ realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: arrayBufferToBase64(pcm16.buffer) } } }));
+      this.ws.send(JSON.stringify({ realtimeInput: { audio: { mimeType: 'audio/pcm;rate=16000', data: arrayBufferToBase64(pcm16.buffer) } } }));
     };
   }
 
