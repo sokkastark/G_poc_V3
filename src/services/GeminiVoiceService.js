@@ -20,7 +20,7 @@ class GeminiVoiceService {
 
   isSupported() { return !!(window.AudioContext || window.webkitAudioContext); }
 
-  startSession(apiKey, queueItem, systemInstructions, callbacks, customInputStream) {
+  startSession(apiKey, queueItem, systemInstructions, callbacks, customInputStream, isTwilioMode) {
     const { onCallStateChange, onError } = callbacks;
     if (!apiKey) return onError?.("Gemini API Key is missing in Settings.");
     onCallStateChange('calling');
@@ -43,7 +43,7 @@ class GeminiVoiceService {
     this.ws.onopen = async () => {
       try {
         this.ws.send(JSON.stringify(this.buildSetupMessage(queueItem, systemInstructions)));
-        await this.startRecording(customInputStream);
+        await this.startRecording(customInputStream, isTwilioMode);
         onCallStateChange('speaking');
       } catch (err) {
         onError?.("Failed to start voice stream: " + err.message);
@@ -87,8 +87,15 @@ class GeminiVoiceService {
     } else { closeContexts(); }
   }
 
-  async startRecording(customInputStream) {
-    this.mediaStream = customInputStream || await navigator.mediaDevices.getUserMedia({ audio: true });
+  async startRecording(customInputStream, isTwilioMode) {
+    if (isTwilioMode) {
+      if (!customInputStream) {
+        throw new Error("No remote audio stream available from Twilio.");
+      }
+      this.mediaStream = customInputStream;
+    } else {
+      this.mediaStream = customInputStream || await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
     this.recordDestination = this.playbackContext.createMediaStreamDestination();
     this.agentAudioDestination = this.playbackContext.createMediaStreamDestination();
     const micSource = this.playbackContext.createMediaStreamSource(this.mediaStream);

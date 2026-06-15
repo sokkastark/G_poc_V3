@@ -131,7 +131,15 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
         const flow = activeFlowRef.current;
         const slotsDesc = "ID: slot-1: Monday 10:00 AM, ID: slot-2: Monday 12:00 PM, ID: slot-3: Tuesday 09:00 AM";
         const isMock = telephonyService.activeProvider === 'mock';
-        const waitRule = isMock ? '' : '- CRITICAL: DO NOT speak first. Remain silent and wait until the patient answers and speaks (e.g. says "Hello?"). Once you hear them speak, respond with the Greeting.';
+        const waitRule = isMock ? '' : `
+          - TELEPHONY CALL ENVIRONMENT (REAL OUTBOUND CALL CONTEXT):
+            1. You are on a real phone call via Twilio.
+            2. At first, you will hear a Twilio Trial / Demo Warning (e.g. "You are using a Twilio trial account. Upgrade to remove this..."). You MUST ignore this warning completely and remain silent!
+            3. After the warning, you will hear phone ringing tones. You MUST ignore these ringing sounds completely and remain silent!
+            4. DO NOT speak first. Do not say your greeting when the call connects, during the warning, or during the ringing.
+            5. Wait until a human answers the call and speaks (e.g. says "Hello?", "Yes?", "Who is this?"). Only then, respond with the Greeting.
+            6. If you hear an automated operator, busy tone, or IVR message indicating the number is unreachable or busy (e.g. "The number you have dialed is not reachable", "is busy", "is out of service"), or if there is no response/silence at all from the other side, you MUST immediately call the "wrong_number" tool to update the status, and then call the "hang_up" tool to disconnect.
+        `;
         
         const instruction = `
           You are "Guardian", a warm, empathetic care coordinator. Calling regarding "${flow.name}" for patient "${queueItem.patientName}".
@@ -166,7 +174,7 @@ export function useSpeech(activeFlow, onOutcomeCaptured) {
             onOutcomeCapturedRef.current?.(queueItem.id, 'No Answer', duration);
             setTimeout(() => { setCallState('idle'); setActiveItem(null); }, 2000);
           }
-        }, session?.remoteStream);
+        }, session?.remoteStream, !isMock);
 
         const geminiStream = geminiVoiceService.getAudioOutputStream();
         if (geminiStream) telephonyService.setAudioInputStream(geminiStream);
