@@ -25,8 +25,7 @@ export function App() {
     filteredQueue,
     callState, transcript, detectedIntent, activeItem, speechError, telephonyLogs,
     endCall,
-    handleStartCall, handleQueueGenerated, handleResetQueue, handleRemoveQueueItem,
-    isAiStarted, activateAi
+    handleStartCall, handleQueueGenerated, handleResetQueue, handleRemoveQueueItem
   } = useCampaign();
 
   return (
@@ -172,7 +171,6 @@ export function App() {
         callState={callState} transcript={transcript} detectedIntent={detectedIntent}
         activeApt={activeItem} rescheduleSlots={[]} speechError={speechError}
         onEndCall={endCall} onExecuteReschedule={() => {}}
-        isAiStarted={isAiStarted} onActivateAi={activateAi} telephonyProvider={telephonyProvider}
       />
 
       <HistoricLogsModal

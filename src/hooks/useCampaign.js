@@ -38,7 +38,7 @@ export function useCampaign() {
 
   const {
     callState, transcript, detectedIntent, activeItem, speechError, telephonyLogs,
-    startCall, endCall, isAiStarted, activateAi
+    startCall, endCall
   } = useSpeech(activeFlow, handleOutcomeCaptured);
 
   const filteredQueue = useMemo(() => {
@@ -120,7 +120,7 @@ export function useCampaign() {
     filteredQueue,
     activeFlow,
     callState, transcript, detectedIntent, activeItem, speechError, telephonyLogs,
-    startCall, endCall, isAiStarted, activateAi,
+    startCall, endCall,
     handleStartCall, handleQueueGenerated, handleResetQueue, handleRemoveQueueItem, handleOutcomeCaptured
   };
 }

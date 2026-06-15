@@ -11,10 +11,7 @@ export function ConsoleOverlay({
   rescheduleSlots = [],
   speechError = null,
   onEndCall,
-  onExecuteReschedule,
-  isAiStarted = false,
-  onActivateAi,
-  telephonyProvider = 'mock'
+  onExecuteReschedule
 }) {
   if (callState === 'idle') return null;
 
@@ -29,9 +26,6 @@ export function ConsoleOverlay({
   };
 
   const getStatusText = () => {
-    if (telephonyProvider === 'twilio' && !isAiStarted && callState === 'active') {
-      return 'LINE CONNECTED - WAITING FOR AI ACTIVATION';
-    }
     switch (callState) {
       case 'calling': return 'DIALING PATIENT...';
       case 'speaking': return 'GUARDIAN IS SPEAKING...';
@@ -67,7 +61,7 @@ export function ConsoleOverlay({
 
         {/* Visual indicators */}
         <div className="p-3 text-center border-bottom">
-          {callState === 'speaking' && isAiStarted && (
+          {callState === 'speaking' && (
             <div className="wave-container">
               <div className="bar"></div>
               <div className="bar"></div>
@@ -76,16 +70,14 @@ export function ConsoleOverlay({
               <div className="bar"></div>
             </div>
           )}
-          {callState === 'listening' && isAiStarted && (
+          {callState === 'listening' && (
             <div className="d-flex align-items-center justify-content-center gap-2">
               <span className="spinner-grow spinner-grow-sm text-success animate-pulse" role="status"></span>
               <span className="small text-success fw-semibold animate-pulse">Microphone Active - Speak Now</span>
             </div>
           )}
-          {(!isAiStarted || callState === 'calling') && (
-            <div className="small text-secondary-emphasis">
-              {callState === 'calling' ? 'Connecting secure outbound line...' : 'Waiting for AI activation...'}
-            </div>
+          {callState === 'calling' && (
+            <div className="small text-secondary-emphasis">Connecting secure outbound line...</div>
           )}
           {callState === 'ended' && (
             <div className="small text-danger fw-semibold">Disconnecting channel...</div>
@@ -138,17 +130,7 @@ export function ConsoleOverlay({
           <div className="text-center mb-3" style={{ fontSize: '0.75rem' }}>
             <span className="text-success"><i className="bi bi-mic-fill me-1"></i> Continuous Bi-directional Voice Stream Active</span>
           </div>
-          <div className="d-flex flex-column gap-2">
-            {!isAiStarted && telephonyProvider === 'twilio' && (
-              <button 
-                type="button" 
-                className="btn btn-success w-100 py-2 fw-bold d-flex align-items-center justify-content-center gap-2"
-                onClick={onActivateAi}
-              >
-                <i className="bi bi-play-circle-fill"></i>
-                Activate AI Coordinator
-              </button>
-            )}
+          <div>
             <button 
               type="button" 
               className="btn btn-danger w-100 d-flex align-items-center justify-content-center"
