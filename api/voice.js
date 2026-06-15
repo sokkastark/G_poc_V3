@@ -12,22 +12,32 @@ export default function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Twilio callback requests can be POST or GET
-  const To = req.body.tocall || req.query.tocall || req.body.To || req.query.To;
+  // Parse request body if Vercel did not automatically parse it as an object
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try {
+      body = Object.fromEntries(new URLSearchParams(body).entries());
+    } catch (e) {}
+  } else if (Buffer.isBuffer(body)) {
+    try {
+      body = Object.fromEntries(new URLSearchParams(body.toString()).entries());
+    } catch (e) {}
+  }
+
+  const To = body.tocall || req.query.tocall || body.To || req.query.To;
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const response = new VoiceResponse();
 
-  console.log(`[Vercel Serverless Webhook] Outbound WebRTC request for To: ${To}`);
+  console.log(`[Voice Webhook] target number To: ${To}`, { body, query: req.query });
 
   if (!To) {
     response.say("Error: No recipient phone number provided.");
   } else {
-    const dial = response.dial({
-      callerId: process.env.TWILIO_CALLER_ID
-    });
+    const dial = response.dial({ callerId: process.env.TWILIO_CALLER_ID });
     dial.number(To);
   }
 
   res.setHeader('Content-Type', 'text/xml');
   res.status(200).send(response.toString());
 }
+
