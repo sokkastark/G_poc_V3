@@ -6,7 +6,7 @@ import ResultsDashboard from './components/dashboard/ResultsDashboard';
 import GlobalFilterBar from './components/dashboard/GlobalFilterBar';
 import TopNavbar from './components/dashboard/TopNavbar';
 import ConversationFlowService from './services/ConversationFlowService';
-import telephonyService from './services/TelephonyService';
+import telephonyService, { TelephonyService } from './services/TelephonyService';
 import ConsoleOverlay from './components/voice/ConsoleOverlay';
 import HistoricLogsModal from './components/voice/HistoricLogsModal';
 import db from './services/DbService';
@@ -53,6 +53,15 @@ export function App() {
               <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 font-monospace text-xs py-1 px-2 d-flex align-items-center gap-1">
                 <span className="rounded-circle bg-secondary d-inline-block" style={{ width: '6px', height: '6px' }}></span>
                 Mock Telephony Active
+              </span>
+            ) : TelephonyService.isLocalhost() ? (
+              <span
+                className="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-50 font-monospace text-xs py-1 px-2 d-flex align-items-center gap-1"
+                title="Twilio webhooks require a public HTTPS URL. Deploy to Vercel to make real calls. Use Mock Telephony for local development."
+                style={{ cursor: 'help' }}
+              >
+                <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                Twilio — Live Only ⚠
               </span>
             ) : (
               <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-monospace text-xs py-1 px-2 d-flex align-items-center gap-1">

@@ -73,10 +73,21 @@ class TwilioAdapter {
   }
 
   async dial(phoneNumber, callbacks) {
-    const { onStatusChange, onConnect, onDisconnect } = callbacks;
+    const { onStatusChange, onDisconnect } = callbacks;
     onStatusChange("dialing");
+
+    // Twilio webhooks require a publicly accessible HTTPS URL.
+    // On localhost, Twilio cannot call back — block immediately with a clear message.
+    if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
+      console.warn('[Twilio] Blocked: Twilio does not work on localhost. Deploy to Vercel to use Twilio mode.');
+      onStatusChange("ended");
+      onDisconnect?.();
+      callbacks.onError?.('Twilio Voice only works on the live deployed site (Vercel). Please switch to Mock Telephony for local development.');
+      return;
+    }
+
     try {
-      const apiBase = window.location.origin.includes('localhost') ? 'http://localhost:5000' : '';
+      const apiBase = '';
       const res = await fetch(`${apiBase}/api/telephony/token`);
       if (!res.ok) throw new Error("Local token server returned status error.");
       const data = await res.json();
@@ -228,6 +239,10 @@ export class TelephonyService {
   constructor() {
     this.adapters = { mock: new MockTelephonyAdapter(), twilio: new TwilioAdapter() };
     this.activeProvider = 'mock';
+  }
+  /** Returns true when running on localhost (Twilio won't work here). */
+  static isLocalhost() {
+    return window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1');
   }
   setProvider(provider) {
     if (this.adapters[provider]) this.activeProvider = provider;

@@ -1,11 +1,11 @@
 // server.js - Token capability generator and TwiML webhook server for Twilio integration.
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const twilio = require('twilio');
+import express from 'express';
+import cors from 'cors';
+import { config } from 'dotenv';
+import twilio from 'twilio';
 
 // Load environment configuration
-dotenv.config();
+config();
 
 const app = express();
 app.use(cors());
@@ -37,8 +37,8 @@ app.get('/api/telephony/status', (req, res) => {
 // Endpoint to fetch WebRTC capability token
 app.get('/api/telephony/token', (req, res) => {
   if (!isTwilioConfigured()) {
-    return res.status(400).json({ 
-      error: 'Twilio credentials not fully configured in backend .env file.' 
+    return res.status(400).json({
+      error: 'Twilio credentials not fully configured in backend .env file.'
     });
   }
 
@@ -50,7 +50,7 @@ app.get('/api/telephony/token', (req, res) => {
       process.env.TWILIO_ACCOUNT_SID,
       process.env.TWILIO_API_KEY,
       process.env.TWILIO_API_SECRET,
-      { 
+      {
         identity: 'guardian_agent_console',
         ttl: 3600
       }
@@ -70,6 +70,8 @@ app.get('/api/telephony/token', (req, res) => {
 });
 
 // Outbound Call TwiML Webhook Endpoint
+// Twilio calls this URL when the browser SDK initiates an outbound call.
+// The 'tocall' param is sent by TelephonyService via device.connect({ params: { tocall } }).
 app.post('/voice', (req, res) => {
   const To = req.body.tocall || req.query.tocall || req.body.To || req.query.To;
   const VoiceResponse = twilio.twiml.VoiceResponse;
@@ -81,7 +83,8 @@ app.post('/voice', (req, res) => {
     response.say("Error: No recipient phone number provided.");
   } else {
     const dial = response.dial({
-      callerId: process.env.TWILIO_CALLER_ID
+      callerId: process.env.TWILIO_CALLER_ID,
+      answerOnBridge: 'true'
     });
     dial.number(To);
   }
@@ -94,9 +97,14 @@ app.post('/voice', (req, res) => {
 app.listen(PORT, () => {
   console.log(`=======================================================`);
   console.log(`Twilio Telephony Token Server running on port ${PORT}`);
-  console.log(`Configuration status: ${isTwilioConfigured() ? 'CONFIGURED' : 'MISSING (Running Mock Only)'}`);
-  if (!isTwilioConfigured()) {
-    console.log(`Warning: Please configure your TWILIO credentials in .env to place real calls.`);
+  console.log(`Configuration status: ${isTwilioConfigured() ? 'CONFIGURED ✓' : 'MISSING — set TWILIO_* in .env'}`);
+  if (isTwilioConfigured()) {
+    console.log(`Caller ID: ${process.env.TWILIO_CALLER_ID}`);
+    console.log(`TwiML App SID: ${process.env.TWILIO_TWIML_APP_SID}`);
   }
+  console.log(`=======================================================`);
+  console.log(`IMPORTANT: The Twilio TwiML App webhook URL must point to`);
+  console.log(`this server's /voice endpoint (use ngrok if testing locally).`);
+  console.log(`e.g. https://<your-ngrok-id>.ngrok.io/voice`);
   console.log(`=======================================================`);
 });
