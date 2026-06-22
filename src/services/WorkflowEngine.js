@@ -121,13 +121,30 @@ export class WorkflowEngine {
     const work = this.getFuzzyValue(record, ['workphone', 'work']);
     const rawPhone = cell || home || work || this.getFuzzyValue(record, ['phone', 'telephone', 'contact']);
 
-    // Normalize phone format to 999-999-9999
-    const digits = rawPhone.toString().replace(/\D/g, '');
+    const cleanRaw = rawPhone.toString().trim();
+    const hasPlus = cleanRaw.startsWith('+');
+    const digits = cleanRaw.replace(/\D/g, '');
     if (digits.length >= 10) {
-      const formatted = `${digits.slice(-10, -7)}-${digits.slice(-7, -4)}-${digits.slice(-4)}`;
-      transformed.phone = formatted;
+      const mainNum = `${digits.slice(-10, -7)}-${digits.slice(-7, -4)}-${digits.slice(-4)}`;
+      // Only embed a country prefix if the number explicitly has one
+      // (hasPlus flag) or digit count exceeds a plain 10-digit local number.
+      if (hasPlus || digits.length > 10) {
+        if (digits.length === 11 && digits.startsWith('1')) {
+          transformed.phone = `+1-${mainNum}`;
+        } else if (digits.length === 12 && digits.startsWith('91')) {
+          transformed.phone = `+91-${mainNum}`;
+        } else if (digits.length > 10) {
+          transformed.phone = `+${digits.slice(0, digits.length - 10)}-${mainNum}`;
+        } else {
+          // hasPlus but exactly 10 digits — keep as-is with plus
+          transformed.phone = `+${mainNum}`;
+        }
+      } else {
+        // Plain 10-digit number with no country prefix
+        transformed.phone = mainNum;
+      }
     } else {
-      transformed.phone = rawPhone || 'No Valid Phone';
+      transformed.phone = cleanRaw || 'No Valid Phone';
     }
 
     // Practice name matching

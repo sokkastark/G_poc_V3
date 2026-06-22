@@ -71,7 +71,7 @@ app.get('/api/telephony/token', (req, res) => {
 
 // Outbound Call TwiML Webhook Endpoint
 app.post('/voice', (req, res) => {
-  const To = req.body.To || req.query.To;
+  const To = req.body.tocall || req.query.tocall || req.body.To || req.query.To;
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const response = new VoiceResponse();
 

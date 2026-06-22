@@ -6,34 +6,34 @@ class MockTelephonyAdapter {
     this.name = "Mock Telephony Provider";
     this.activeCall = null;
   }
-  dial(phoneNumber, callbacks) {
-    const { onStatusChange, onConnect, onDisconnect } = callbacks;
+  dial(phoneNumber, { onStatusChange, onConnect, onDisconnect }) {
     onStatusChange("dialing");
-    const ringTimeout = setTimeout(() => {
+    const t1 = setTimeout(() => {
       onStatusChange("ringing");
-      const connectTimeout = setTimeout(() => {
+      const t2 = setTimeout(() => {
         onStatusChange("in-progress");
-        this.activeCall = { id: `call-${Math.random().toString(36).substr(2, 9)}`, phone: phoneNumber };
+        this.activeCall = { id: `call-${Math.random().toString(36).substring(2, 11)}`, phone: phoneNumber };
         onConnect?.(this.activeCall);
       }, 1500);
-      this.activeCall = { ...this.activeCall, timeouts: [connectTimeout] };
+      this.activeCall.timeouts.push(t2);
     }, 1000);
-    this.activeCall = { id: 'pending', phone: phoneNumber, timeouts: [ringTimeout], onDisconnect };
+    this.activeCall = { id: 'pending', phone: phoneNumber, timeouts: [t1], onDisconnect };
   }
   hangup() {
     if (this.activeCall) {
-      if (this.activeCall.timeouts) this.activeCall.timeouts.forEach(clearTimeout);
+      this.activeCall.timeouts?.forEach(clearTimeout);
       this.activeCall.onDisconnect?.();
       this.activeCall = null;
     }
   }
   setAudioInputStream(stream) {}
   getLogs(phoneNumber) {
+    const t = () => new Date().toLocaleTimeString();
     return [
-      { timestamp: new Date().toLocaleTimeString(), message: `[Mock] Initializing SIP invite to ${phoneNumber}` },
-      { timestamp: new Date().toLocaleTimeString(), message: `[Mock] Status 100 Trying` },
-      { timestamp: new Date().toLocaleTimeString(), message: `[Mock] Status 180 Ringing` },
-      { timestamp: new Date().toLocaleTimeString(), message: `[Mock] Call answered. Bridging audio channels.` }
+      { timestamp: t(), message: `[Mock] Initializing SIP invite to ${phoneNumber}` },
+      { timestamp: t(), message: `[Mock] Status 100 Trying` },
+      { timestamp: t(), message: `[Mock] Status 180 Ringing` },
+      { timestamp: t(), message: `[Mock] Call answered. Bridging audio channels.` }
     ];
   }
 }
@@ -45,25 +45,19 @@ class TwilioAdapter {
     this.device = null;
     this.fallbackAdapter = null;
     this.currentProcessor = null;
-    this._originalGUM = null;   // saved real getUserMedia
-    this._silentGUMCtx = null;  // AudioContext for silent mic stream
+    this._originalGUM = null;
+    this._silentGUMCtx = null;
   }
 
-  // Intercept navigator.mediaDevices.getUserMedia so Twilio SDK gets a
-  // silent MediaStream instead of requesting real mic permission.
-  // In Twilio outbound-call mode, no one speaks from the browser —
-  // Gemini's voice is routed to the patient via the Twilio AudioProcessor.
   _patchGUM() {
     if (this._originalGUM) return;
     this._originalGUM = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    const self = this;
-    navigator.mediaDevices.getUserMedia = async (constraints) => {
-      if (constraints?.audio) {
-        console.log('[Twilio] getUserMedia intercepted → returning silent stream (no mic permission needed)');
-        self._silentGUMCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        return self._silentGUMCtx.createMediaStreamDestination().stream;
+    navigator.mediaDevices.getUserMedia = async (c) => {
+      if (c?.audio) {
+        this._silentGUMCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        return this._silentGUMCtx.createMediaStreamDestination().stream;
       }
-      return self._originalGUM(constraints);
+      return this._originalGUM(c);
     };
   }
 
@@ -77,6 +71,7 @@ class TwilioAdapter {
       this._silentGUMCtx = null;
     }
   }
+
   async dial(phoneNumber, callbacks) {
     const { onStatusChange, onConnect, onDisconnect } = callbacks;
     onStatusChange("dialing");
@@ -86,6 +81,24 @@ class TwilioAdapter {
       if (!res.ok) throw new Error("Local token server returned status error.");
       const data = await res.json();
       if (!data.token) throw new Error("No token returned from server.");
+
+      let country = '91';
+      try {
+        const statusRes = await fetch(`${apiBase}/api/telephony/status`);
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          const cid = statusData.callerId || '';
+          if (cid.startsWith('+1')) country = '1';
+          else if (cid.startsWith('+91')) country = '91';
+          else {
+            const m = cid.match(/^\+(\d{1,3})/);
+            if (m) country = m[1];
+          }
+        }
+      } catch (e) {
+        console.warn('[Twilio] Error fetching callerId status:', e);
+      }
+
       this.device = new Device(data.token, { logLevel: 'debug', codecPreferences: ['pcmu', 'opus'] });
       this.device.on('error', (err) => {
         console.error('[Twilio Device Error]', err);
@@ -93,49 +106,45 @@ class TwilioAdapter {
         onDisconnect?.();
       });
       await this.device.register();
+
       let targetNumber = phoneNumber.trim();
+      const hasPlus = targetNumber.startsWith('+');
       const digits = targetNumber.replace(/\D/g, '');
+      targetNumber = (hasPlus ? '+' : '') + digits;
       if (!targetNumber.startsWith('+')) {
-        if (digits.length === 10) targetNumber = `+91${digits}`;
-        else if (digits.length === 12 && digits.startsWith('91')) targetNumber = `+${digits}`;
+        if (digits.length === 10) targetNumber = `+${country}${digits}`;
+        else if (digits.length === (10 + country.length) && digits.startsWith(country)) targetNumber = `+${digits}`;
         else if (digits.length === 11 && digits.startsWith('1')) targetNumber = `+${digits}`;
+        else if (digits.length === 12 && digits.startsWith('91')) targetNumber = `+${digits}`;
         else targetNumber = `+${digits}`;
       }
-      // Patch getUserMedia BEFORE device.connect() so Twilio SDK never
-      // requests real mic permission. The silent stream is used as the
-      // "local mic" while Gemini's audio reaches the patient via AudioProcessor.
+
       this._patchGUM();
       const call = await this.device.connect({ params: { tocall: targetNumber } });
       this.activeCall = call;
+
       call.on('accept', () => {
         onStatusChange("in-progress");
         const callId = call.parameters?.CallSid || `twilio-${Date.now()}`;
         let resolved = false;
 
-        // Resolve once — called with remoteStream (or null if unreachable/timeout)
         const finish = (stream) => {
           if (resolved) return;
           resolved = true;
-          console.log('[Twilio] onConnect with remote stream:', stream ? 'YES ✓' : 'NULL (silent mode)');
           onConnect?.({ id: callId, remoteStream: stream });
         };
 
-        // Attach ontrack listener to RTCPeerConnection.
-        // This event fires exactly when Twilio negotiates the remote audio track.
         const attachTrackListener = () => {
           const pc = call._mediaHandler?.version?.pc
                    || call._mediaHandler?._pc
                    || call._peerConnection
                    || call._mediaHandler?.peerConnection;
           if (!pc) return false;
-          // Check if tracks already exist (call was fast)
-          const existing = (pc.getReceivers?.() || [])
-            .map(r => r.track).filter(t => t?.kind === 'audio');
+          const existing = (pc.getReceivers?.() || []).map(r => r.track).filter(t => t?.kind === 'audio');
           if (existing.length) {
             finish(new MediaStream(existing));
             return true;
           }
-          // Listen for the remote audio track
           pc.addEventListener('track', (ev) => {
             const s = ev.streams?.[0] || (ev.track ? new MediaStream([ev.track]) : null);
             if (s) finish(s);
@@ -143,7 +152,6 @@ class TwilioAdapter {
           return true;
         };
 
-        // Try immediately; if PC not ready yet, poll briefly (max 3s)
         if (!attachTrackListener()) {
           let ticks = 0;
           const poll = setInterval(() => {
@@ -151,20 +159,12 @@ class TwilioAdapter {
           }, 100);
         }
 
-        // 5-second hard timeout → null stream (unreachable, busy, no audio)
         setTimeout(() => finish(null), 5000);
       });
 
-      call.on('disconnect', () => {
-        onStatusChange("ended");
-        onDisconnect?.();
-        this.activeCall = null;
-      });
-      call.on('reject', () => {
-        onStatusChange("ended");
-        onDisconnect?.();
-        this.activeCall = null;
-      });
+      const cleanup = () => { onStatusChange("ended"); onDisconnect?.(); this.activeCall = null; };
+      call.on('disconnect', cleanup);
+      call.on('reject', cleanup);
       onStatusChange("ringing");
     } catch (err) {
       console.error("[Twilio] Real calling failed:", err.message);
@@ -173,8 +173,9 @@ class TwilioAdapter {
       callbacks.onError?.(err.message);
     }
   }
+
   hangup() {
-    this._restoreGUM(); // Always restore getUserMedia on hangup
+    this._restoreGUM();
     if (this.fallbackAdapter) {
       this.fallbackAdapter.hangup();
       this.fallbackAdapter = null;
@@ -193,37 +194,32 @@ class TwilioAdapter {
       this.device = null;
     }
   }
+
   setAudioInputStream(stream) {
-    if (this.fallbackAdapter) {
-      this.fallbackAdapter.setAudioInputStream(stream);
-      return;
-    }
+    if (this.fallbackAdapter) return this.fallbackAdapter.setAudioInputStream(stream);
     if (!this.device) return;
     if (this.currentProcessor) {
       try { this.device.audio.removeProcessor(this.currentProcessor, false); } catch (e) {}
       this.currentProcessor = null;
     }
     if (stream) {
-      this.currentProcessor = {
-        async createProcessedStream() {
-          return stream;
-        },
-        async destroyProcessedStream() {}
-      };
+      this.currentProcessor = { createProcessedStream: async () => stream, destroyProcessedStream: async () => {} };
       this.device.audio.addProcessor(this.currentProcessor, false);
     }
   }
+
   getLogs(phoneNumber) {
+    const t = () => new Date().toLocaleTimeString();
     if (this.fallbackAdapter) {
       return [
-        { timestamp: new Date().toLocaleTimeString(), message: `[Twilio fallback ➔ Mock] Real calling unavailable. Defaulting to mock trace.` },
+        { timestamp: t(), message: `[Twilio fallback ➔ Mock] Real calling unavailable. Defaulting to mock trace.` },
         ...this.fallbackAdapter.getLogs(phoneNumber)
       ];
     }
     return [
-      { timestamp: new Date().toLocaleTimeString(), message: `[Twilio WebRTC] Querying capability token from helper server...` },
-      { timestamp: new Date().toLocaleTimeString(), message: `[Twilio WebRTC] Device registered. WebRTC audio bridge ready.` },
-      { timestamp: new Date().toLocaleTimeString(), message: `[Twilio WebRTC] Outbound SIP dial initiated to ${phoneNumber}` }
+      { timestamp: t(), message: `[Twilio WebRTC] Querying capability token from helper server...` },
+      { timestamp: t(), message: `[Twilio WebRTC] Device registered. WebRTC audio bridge ready.` },
+      { timestamp: t(), message: `[Twilio WebRTC] Outbound SIP dial initiated to ${phoneNumber}` }
     ];
   }
 }
